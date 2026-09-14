@@ -1,0 +1,26 @@
+{
+  "name": "aether-wcag-scanner",
+  "displayName": "Aether WCAG Scanner",
+  "version": "1.0.0",
+  "description": "WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. Scans live URLs via Playwright + axe-core across desktop, tablet, and mobile viewports and returns violations paired with corpus-backed fixes and WCAG technique references.",
+  "author": {
+    "name": "Allchemy Labs",
+    "email": "hello@allchemylabs.ai",
+    "url": "https://allchemylabs.ai"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/allchemylabs/aether-wcag-scanner",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/allchemylabs/aether-wcag-scanner.git"
+  },
+  "keywords": ["accessibility", "wcag", "a11y", "scanner", "axe-core", "playwright"],
+  "userConfig": {
+    "api_key": {
+      "type": "string",
+      "description": "Optional Allchemy Labs API key. Enables RAG-powered fixes from the hosted insights engine. Without it, the scanner still works fully offline using built-in fix templates.",
+      "required": false,
+      "sensitive": true
+    }
+  }
+}

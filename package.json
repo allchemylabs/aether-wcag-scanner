@@ -1,0 +1,41 @@
+{
+  "name": "aether-wcag-scanner",
+  "version": "1.0.0",
+  "description": "WCAG 2.1 AA accessibility scanner with RAG-powered fixes, packaged as a Claude Code MCP plugin and standalone CLI.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Allchemy Labs",
+  "homepage": "https://github.com/allchemylabs/aether-wcag-scanner",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/allchemylabs/aether-wcag-scanner.git"
+  },
+  "bin": {
+    "aether-wcag-scanner": "src/mcp-server/index.ts"
+  },
+  "scripts": {
+    "start": "node --import tsx src/mcp-server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^17.2.3",
+    "google-auth-library": "^9.15.1",
+    "picocolors": "^1.0.1",
+    "playwright": "^1.56.1",
+    "tsx": "^4.19.0",
+    "zod": "^4.4.3"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

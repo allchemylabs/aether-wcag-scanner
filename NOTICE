@@ -1,0 +1,30 @@
+Aether WCAG Scanner
+Copyright (c) 2026 Allchemy Labs
+
+This product includes open-source client software licensed under the MIT
+License (see the LICENSE file). The MIT License applies ONLY to the
+distributed client software in this repository (the scanner CLI, the Claude
+Code plugin, and their supporting source files).
+
+SCOPE OF THE MIT LICENSE
+------------------------
+The MIT License does NOT extend to, and confers no rights in, any of
+Allchemy Labs' hosted services, backend infrastructure, models, data, or
+related intellectual property that the client software may communicate with
+or rely upon, including but not limited to:
+
+  - the Allchemy Labs insights/analysis services and their hosted endpoints;
+  - any models, datasets, knowledge bases, embeddings, indexes, prompts, or
+    other content used to power those services;
+  - the deployment, orchestration, and infrastructure tooling that operates
+    those services; and
+  - any future products, services, data, or intellectual property developed
+    by Allchemy Labs, regardless of their architecture or implementation.
+
+All such services and intellectual property are proprietary to Allchemy Labs
+and are provided, if at all, only under separate commercial terms. Access to
+them requires valid authorization and is governed by those terms, not by the
+MIT License.
+
+Use of the client software does not grant any license, right, or interest in
+the proprietary services or intellectual property described above.

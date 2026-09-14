@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "aether-wcag-scanner": {
+      "command": "node",
+      "args": ["--import", "tsx", "${CLAUDE_PLUGIN_ROOT}/src/mcp-server/index.ts"],
+      "cwd": "${CLAUDE_PLUGIN_ROOT}",
+      "env": {
+        "NODE_PATH": "${CLAUDE_PLUGIN_DATA}/node_modules",
+        "ALLCHEMY_API_KEY": "${user_config.api_key}"
+      }
+    }
+  }
+}
