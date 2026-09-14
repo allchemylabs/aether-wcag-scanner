@@ -93,6 +93,28 @@ which deadlocks on apps with long-polling or websockets. A config that sets
 - Node.js >= 20
 - Chromium (installed automatically on first run)
 
+## Disclaimer
+
+Aether is an accessibility analysis and guidance tool. Using the platform does not, by
+itself, make your website, application, or digital service conformant with WCAG, the ADA
+(including Title II), the European Accessibility Act, Section 508, EN 301 549, or any other
+accessibility law or standard.
+
+Automated scans detect only a subset of accessibility barriers. A "zero issues" result means
+the scanner did not flag anything in its detection range — not that the property is legally
+compliant.
+
+You remain responsible for:
+
+- reviewing findings with qualified people
+- fixing issues in the underlying code and content
+- conducting or commissioning manual testing and audits as needed
+- maintaining accessibility as the product changes
+- obtaining legal advice for your specific obligations
+
+Aether does not provide legal advice and does not replace an accessibility audit or a
+VPAT/ACR prepared by a qualified auditor.
+
 ## License
 
 MIT for the client (this plugin). The hosted insights engine and related
