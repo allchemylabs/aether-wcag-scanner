@@ -10,14 +10,19 @@
   },
   "license": "MIT",
   "homepage": "https://github.com/allchemylabs/aether-wcag-scanner",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/allchemylabs/aether-wcag-scanner.git"
-  },
-  "keywords": ["accessibility", "wcag", "a11y", "scanner", "axe-core", "playwright"],
+  "repository": "https://github.com/allchemylabs/aether-wcag-scanner",
+  "keywords": [
+    "accessibility",
+    "wcag",
+    "a11y",
+    "scanner",
+    "axe-core",
+    "playwright"
+  ],
   "userConfig": {
     "api_key": {
       "type": "string",
+      "title": "Allchemy Labs API key",
       "description": "Optional Allchemy Labs API key. Enables RAG-powered fixes from the hosted insights engine. Without it, the scanner still works fully offline using built-in fix templates.",
       "required": false,
       "sensitive": true
