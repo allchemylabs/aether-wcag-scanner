@@ -30,7 +30,7 @@ const PACKAGE_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..', 
 // the single most common support question is "which key is the plugin using?".
 const apiKeySource: string = process.env.ALLCHEMY_API_KEY ? 'shell environment' : '';
 const PACKAGE_ENV = resolvePath(PACKAGE_ROOT, '.env');
-const CWD_ENV = resolvePath(process.cwd(), '.env');
+const CWD_ENV = resolvePath(process.env.AETHER_PROJECT_CWD || process.cwd(), '.env');
 const beforePackage = process.env.ALLCHEMY_API_KEY;
 loadDotenv({ path: PACKAGE_ENV, override: false, quiet: true });
 const beforeCwd = process.env.ALLCHEMY_API_KEY;

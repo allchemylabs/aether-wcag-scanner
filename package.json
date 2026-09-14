@@ -14,9 +14,8 @@
     "aether-wcag-scanner": "src/mcp-server/index.ts"
   },
   "scripts": {
-    "start": "node --import tsx src/mcp-server/index.ts",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "playwright install chromium"
+    "start": "node scripts/start.js",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.11.0",
