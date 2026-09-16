@@ -359,6 +359,17 @@ function getTemplateFix(
   };
 }
 
+/**
+ * axe-style WCAG tags (e.g. `wcag412`) for a rule, from the local rule metadata.
+ * The server derives the finding's success criteria from these; without them a
+ * rule absent from its fallback table reaches the grounding gate with an empty
+ * criteria list and every candidate is rejected (server issue #1).
+ */
+export function wcagTagsFor(ruleId: string): string[] {
+  const wcag = getRuleMetadata(ruleId)?.wcag ?? [];
+  return wcag.map((c) => `wcag${c.sc.replace(/\./g, '')}`);
+}
+
 async function callInsightsForViolation(req: FixRequest): Promise<InsightResponse> {
   return getInsights({
     axeResults: {
@@ -367,6 +378,7 @@ async function callInsightsForViolation(req: FixRequest): Promise<InsightRespons
           id: req.ruleId,
           description: getRuleMetadata(req.ruleId)?.description ?? req.ruleId,
           impact: getRuleMetadata(req.ruleId)?.impact,
+          tags: wcagTagsFor(req.ruleId),
           nodes: [
             {
               html: req.html,
@@ -396,6 +408,7 @@ async function callInsightsForExplain(ruleId: string, scanId?: string): Promise<
           id: ruleId,
           description: metadata?.description ?? ruleId,
           impact: metadata?.impact,
+          tags: wcagTagsFor(ruleId),
           nodes: [{ html: `<div data-rule="${ruleId}"></div>` }],
         },
       ],

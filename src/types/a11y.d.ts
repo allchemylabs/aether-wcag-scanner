@@ -1,4 +1,6 @@
 export interface Violation {
+  /** axe rule tags (e.g. `wcag2a`, `wcag412`); the server derives the finding's success criteria from these. */
+  tags?: string[];
   id: string;
   description: string;
   impact?: string;
