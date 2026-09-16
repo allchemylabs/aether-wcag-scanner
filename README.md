@@ -32,7 +32,7 @@ technique snippets.
 ## Install
 
 ```
-/plugin marketplace add allchemylabs/claude-plugins
+/plugin marketplace add https://github.com/allchemylabs/claude-plugins.git
 /plugin install aether-wcag-scanner@allchemylabs
 ```
 
