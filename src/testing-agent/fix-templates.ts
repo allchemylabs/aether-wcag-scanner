@@ -306,7 +306,9 @@ export const FIX_TEMPLATES: Record<string, FixTemplate> = {
       const fgMatch = summary.match(/foreground color:\s*(#[0-9a-fA-F]{6})/);
       const bgMatch = summary.match(/background color:\s*(#[0-9a-fA-F]{6})/);
       const expectedMatch = summary.match(/Expected contrast ratio of\s+([\d.]+):1/);
-      const currentMatch = summary.match(/contrast ratio of\s+([\d.]+):1/);
+      // axe phrases the measured ratio as "insufficient color contrast of 3.0:1" and the
+      // target as "Expected contrast ratio of 4.5:1"; the old pattern matched the target.
+      const currentMatch = summary.match(/contrast of\s+([\d.]+):1/) || summary.match(/has a contrast ratio of\s+([\d.]+):1/);
       const sizeMatch = summary.match(/font size:\s+([\d.]+)pt/i);
       const weightMatch = summary.match(/font weight:\s*(normal|bold|\d+)/i);
 
@@ -334,34 +336,71 @@ export const FIX_TEMPLATES: Record<string, FixTemplate> = {
         return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
       };
 
-      const bgLum = luminance(...hexToRgb(bg));
-      const toward = bgLum > 0.5 ? [0, 0, 0] : [255, 255, 255];
-      const fgRgb = hexToRgb(fg);
-      let low = 0, high = 1, bestHex = fg;
-      for (let i = 0; i < 32; i++) {
-        const mid = (low + high) / 2;
-        const r = Math.round(fgRgb[0] + (toward[0] - fgRgb[0]) * mid);
-        const g = Math.round(fgRgb[1] + (toward[1] - fgRgb[1]) * mid);
-        const b = Math.round(fgRgb[2] + (toward[2] - fgRgb[2]) * mid);
-        const candidate = rgbToHex(r, g, b);
-        if (contrastRatio(candidate, bg) >= target) {
-          bestHex = candidate;
-          high = mid;
-        } else {
-          low = mid;
+      // Move `base` toward black or white (keeping `other` fixed) until the pair meets
+      // `target`; try both poles and keep the smaller change. Returns null when neither
+      // pole can reach the target — never the original colour (that produced a
+      // "#ffffff → #ffffff" no-op for white text on mid-tone backgrounds, issue #2).
+      const searchTowardPoles = (base: string, other: string): { change: number; hex: string } | null => {
+        const baseRgb = hexToRgb(base);
+        let best: { change: number; hex: string } | null = null;
+        for (const toward of [[0, 0, 0], [255, 255, 255]] as const) {
+          const poleHex = rgbToHex(toward[0], toward[1], toward[2]);
+          if (contrastRatio(poleHex, other) < target) continue;
+          let low = 0, high = 1;
+          let found = { change: 1, hex: poleHex };
+          for (let i = 0; i < 32; i++) {
+            const mid = (low + high) / 2;
+            const candidate = rgbToHex(
+              Math.round(baseRgb[0] + (toward[0] - baseRgb[0]) * mid),
+              Math.round(baseRgb[1] + (toward[1] - baseRgb[1]) * mid),
+              Math.round(baseRgb[2] + (toward[2] - baseRgb[2]) * mid),
+            );
+            if (contrastRatio(candidate, other) >= target) { found = { change: mid, hex: candidate }; high = mid; }
+            else { low = mid; }
+          }
+          if (!best || found.change < best.change) best = found;
         }
-      }
+        return best;
+      };
 
-      const newRatio = contrastRatio(bestHex, bg);
-      const fixCss = `/* Fix: change foreground from ${fg} to ${bestHex} */\n.element { color: ${bestHex}; }`;
+      const fgFound = searchTowardPoles(fg, bg);
+      const bgFound = searchTowardPoles(bg, fg);
+      if (!fgFound && !bgFound) return {
+          fixHtml: html,
+          explanation: `Contrast ${current.toFixed(1)}:1 (${fg} on ${bg}) does not meet ${target}:1, and no adjustment of either colour alone reaches it. Choose a different foreground/background pair.`,
+        }; // nothing deterministic reaches the target
+      const useFg = !!fgFound && (!bgFound || fgFound.change <= bgFound.change);
+
+      let fixCss: string;
       let fixHtml: string;
-      if (html.includes('style=') && html.includes('color:')) {
-        fixHtml = html.replace(/color:\s*[^;"]+/, `color: ${bestHex}`) + `\n\n${fixCss}`;
+      let newRatio: number;
+      let remedy: string;
+      if (useFg && fgFound) {
+        newRatio = contrastRatio(fgFound.hex, bg);
+        fixCss = `/* Fix: change foreground from ${fg} to ${fgFound.hex} */\n.element { color: ${fgFound.hex}; }`;
+        fixHtml = html.includes('style=') && html.includes('color:')
+          ? html.replace(/(?<![a-z-])color:\s*[^;"']+/, `color: ${fgFound.hex}`) + `\n\n${fixCss}`
+          : `${html}\n\n${fixCss}`;
+        remedy = `Changed foreground to ${fgFound.hex} (${newRatio.toFixed(1)}:1).`;
+      } else if (bgFound) {
+        newRatio = contrastRatio(fg, bgFound.hex);
+        fixCss = `/* Fix: keep text ${fg}; change background from ${bg} to ${bgFound.hex} (smaller change than recolouring the text) */\n.element { background-color: ${bgFound.hex}; }`;
+        fixHtml = html.includes('style=') && /background(?:-color)?:/.test(html)
+          ? html.replace(/background(?:-color)?:\s*[^;"']+/, `background-color: ${bgFound.hex}`) + `\n\n${fixCss}`
+          : `${html}\n\n${fixCss}`;
+        remedy = `Changed background to ${bgFound.hex} (${newRatio.toFixed(1)}:1) and kept the text colour ${fg}, a smaller visual change than recolouring the text.`;
       } else {
-        fixHtml = `${html}\n\n${fixCss}`;
+        return {
+          fixHtml: html,
+          explanation: `Contrast ${current.toFixed(1)}:1 (${fg} on ${bg}) does not meet ${target}:1, and no adjustment of either colour alone reaches it. Choose a different foreground/background pair.`,
+        };
       }
+      if (newRatio < target) return {
+          fixHtml: html,
+          explanation: `Contrast ${current.toFixed(1)}:1 (${fg} on ${bg}) does not meet ${target}:1, and no adjustment of either colour alone reaches it. Choose a different foreground/background pair.`,
+        }; // never ship a fix that still fails
 
-      let explanation = `Contrast ${current.toFixed(1)}:1 (${fg} on ${bg}) does not meet ${target}:1. Changed foreground to ${bestHex} (${newRatio.toFixed(1)}:1).`;
+      let explanation = `Contrast ${current.toFixed(1)}:1 (${fg} on ${bg}) does not meet ${target}:1. ${remedy}`;
       if (fontSize >= 18 || (fontSize >= 14 && fontWeight === 'bold')) {
         explanation += ' Large text: 3:1 minimum applies.';
       }
@@ -606,10 +645,28 @@ export const FIX_TEMPLATES: Record<string, FixTemplate> = {
 
   'aria-allowed-role': {
     errorSummary: 'ARIA role is not valid for this element type',
-    generateFix: (html) => ({
-      fixHtml: html.replace(/\s*role="[^"]*"/, ''),
-      explanation: 'Remove the invalid role, or change to an element that supports it.',
-    }),
+    generateFix: (html) => {
+      const roleMatch = html.match(/\srole\s*=\s*"([^"]*)"/i);
+      const role = roleMatch ? roleMatch[1].trim().toLowerCase() : '';
+      let fixed = html.replace(/\s*role\s*=\s*"[^"]*"/i, '');
+      let explanation = 'Remove the invalid role, or change to an element that supports it.';
+      if (role === 'heading') {
+        // aria-level is only valid alongside role="heading"; leaving it behind trips
+        // aria-allowed-attr, and dropping the page's only heading level 1 trips
+        // page-has-heading-one. Say so instead of trading one violation for two.
+        const levelMatch = html.match(/\saria-level\s*=\s*"(\d+)"/i);
+        fixed = fixed.replace(/\s*aria-level\s*=\s*"[^"]*"/i, '');
+        const level = levelMatch ? levelMatch[1] : '1';
+        explanation =
+          `Removed role="heading" and its aria-level (aria-level is only valid with role="heading"). ` +
+          `This element is not allowed to be a heading; if the page relied on it as its <h${level}>, ` +
+          `add a real <h${level}> element with the same text instead.`;
+      } else if (/\saria-level\s*=/i.test(html)) {
+        fixed = fixed.replace(/\s*aria-level\s*=\s*"[^"]*"/i, '');
+        explanation += ' Also removed aria-level, which is only valid with role="heading".';
+      }
+      return { fixHtml: fixed, explanation };
+    },
   },
 
   'presentation-role-conflict': {
