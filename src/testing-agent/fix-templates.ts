@@ -170,6 +170,22 @@ function resolveNameFix(rule: string, html: string, node?: ViolationNode): FixRe
     };
   }
   // link-name default.
+  if (rule === 'aria-command-name' || rule === 'aria-toggle-field-name') {
+    // role="button"/"link"/"menuitem" (or switch/checkbox) on a non-native element
+    // with no text: name it in place (server issue #4: never substitute an example).
+    if (hasAttribute(html, 'aria-label')) {
+      return {
+        fixHtml: html,
+        explanation: 'Ensure the existing aria-label value is a non-empty description of the action.',
+      };
+    }
+    return {
+      fixHtml: insertAttribute(html, 'aria-label', '[Describe the action, e.g. Close]'),
+      explanation:
+        'Add an aria-label describing the action (e.g. aria-label="Close"), or aria-labelledby pointing at ' +
+        "visible text. If the control is a third-party widget, set the label through its configuration.",
+    };
+  }
   return {
     fixHtml: insertAttribute(html, 'aria-label', '[Link purpose]'),
     explanation: 'Add visible text content, an aria-label, or aria-labelledby reference to the link.',
@@ -274,6 +290,16 @@ export const FIX_TEMPLATES: Record<string, FixTemplate> = {
   'button-name': {
     errorSummary: 'Button has no accessible name',
     generateFix: (html, node) => resolveNameFix('button-name', html, node),
+  },
+
+  'aria-command-name': {
+    errorSummary: 'ARIA command (button/link/menuitem role) has no accessible name',
+    generateFix: (html, node) => resolveNameFix('aria-command-name', html, node),
+  },
+
+  'aria-toggle-field-name': {
+    errorSummary: 'ARIA toggle field (checkbox/switch role) has no accessible name',
+    generateFix: (html, node) => resolveNameFix('aria-toggle-field-name', html, node),
   },
 
   'page-has-heading-one': {
