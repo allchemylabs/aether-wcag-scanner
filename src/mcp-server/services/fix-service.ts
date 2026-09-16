@@ -314,7 +314,7 @@ function parseApiError(err: unknown): RateLimitInfo | undefined {
   if (err.status === 401) {
     return {
       tier: 'none',
-      message: 'Invalid API key. Set ALLCHEMY_API_KEY with a valid key from https://allchemy.io/keys',
+      message: 'Invalid API key. Set ALLCHEMY_API_KEY with a valid key from https://beta.allchemylabs.ai (sign in with GitHub to get or rotate one)',
     };
   }
 

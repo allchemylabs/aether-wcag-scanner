@@ -32,6 +32,7 @@
  */
 
 import { chromium } from 'playwright';
+import { ensureChromiumInstalled } from './browser-bootstrap.ts';
 import type { Browser, BrowserContext, Page } from 'playwright';
 import { createHash } from 'crypto';
 import { runAxeOnPage as runAxe } from './axe.ts';
@@ -94,6 +95,7 @@ export class SPAScanner {
   // --------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
+    await ensureChromiumInstalled();
     this.browser = await chromium.launch({
       headless: true,
       // Sandbox stays on unless root / AETHER_NO_SANDBOX=1 (browser-args.ts).

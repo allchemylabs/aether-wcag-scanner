@@ -26,6 +26,13 @@ import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Claude Code substitutes an UNSET plugin userConfig value as an empty string, so
+// the plugin's .mcp.json hands us ALLCHEMY_API_KEY="" when the user skipped the
+// prompt. dotenv treats any present key as "already set" and would then never
+// read the project's .env. Treat empty as unset so the documented .env fallback works.
+for (const name of ['ALLCHEMY_API_KEY', 'ALLCHEMY_INSIGHT_URL']) {
+  if (process.env[name] !== undefined && process.env[name].trim() === '') delete process.env[name];
+}
 // Remember where ALLCHEMY_API_KEY came from so the startup line below can say so —
 // the single most common support question is "which key is the plugin using?".
 const apiKeySource: string = process.env.ALLCHEMY_API_KEY ? 'shell environment' : '';

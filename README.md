@@ -39,12 +39,24 @@ technique snippets.
 Once the official Claude Code marketplace listing is live, you can also install
 it directly from there.
 
-### Optional: enable RAG-powered fixes
+The install prompts for your **Allchemy Labs API key**; paste the key you got
+from [beta.allchemylabs.ai](https://beta.allchemylabs.ai). To set or change it
+later:
 
-The plugin works fully offline out of the box. To enable corpus-grounded fixes
-from the hosted insights engine, set your Allchemy Labs API key when prompted
-during install (or via the plugin's config). Without a key, you get template
-fixes — no account required.
+```
+/plugin configure aether-wcag-scanner@allchemylabs
+```
+
+The first start installs the plugin's dependencies (about a minute) and the
+first scan downloads Chromium for Playwright. If `/mcp` shows the server as not
+connected right after install, wait a moment and run `/reload-plugins`.
+
+### Running without a key
+
+The scanner itself runs locally and works without a key: you get template
+fixes for every violation. The key adds corpus-grounded fixes from the hosted
+insights engine. Set it via the prompt above, or put `ALLCHEMY_API_KEY=<key>`
+in the `.env` of the project you are scanning.
 
 ---
 

@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { ensureChromiumInstalled } from './browser-bootstrap.ts';
 import type { Browser, BrowserContext } from 'playwright';
 import { runAxeOnPage as runAxe } from './axe.ts';
 import { loadUIAutomationSteps } from '../ui-automation/step-loader.ts';
@@ -93,6 +94,7 @@ export class ClusterScanner {
    * Initialize the browser
    */
   async initialize(): Promise<void> {
+    await ensureChromiumInstalled();
     this.browser = await chromium.launch({
       headless: true,
       // Sandbox stays on unless root / AETHER_NO_SANDBOX=1 (browser-args.ts).

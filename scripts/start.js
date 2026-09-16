@@ -2,7 +2,10 @@
 /**
  * MCP server launcher for the aether-wcag-scanner plugin (what .mcp.json runs).
  *
- * 1. Makes sure dependencies + Chromium are installed (see ensure-deps.js).
+ * 1. Makes sure node_modules is installed (see ensure-deps.js). Chromium is NOT
+ *    downloaded here — Claude Code gives the server ~60 s to answer the MCP
+ *    handshake, so the browser is fetched lazily on the first scan (and pre-warmed
+ *    by the SessionStart hook).
  * 2. Starts the TypeScript MCP server via tsx with the plugin directory as cwd so
  *    `--import tsx` and every package import resolve from the plugin's node_modules.
  *
@@ -12,10 +15,10 @@
  */
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { ensureDeps, PLUGIN_ROOT } from './ensure-deps.js';
+import { ensureNodeModules, PLUGIN_ROOT } from './ensure-deps.js';
 
 try {
-  ensureDeps();
+  ensureNodeModules();
 } catch (err) {
   process.stderr.write(`[aether-wcag-scanner] cannot start: ${err?.message ?? err}\n`);
   process.exit(1);

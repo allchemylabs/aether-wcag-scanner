@@ -23,8 +23,8 @@
     "api_key": {
       "type": "string",
       "title": "Allchemy Labs API key",
-      "description": "Optional Allchemy Labs API key. Enables RAG-powered fixes from the hosted insights engine. Without it, the scanner still works fully offline using built-in fix templates.",
-      "required": false,
+      "description": "Your Allchemy Labs beta key from https://beta.allchemylabs.ai (sign in with GitHub). Enables corpus-grounded fixes from the hosted insights engine; the scanner itself runs locally. Change it later with /plugin configure aether-wcag-scanner@allchemylabs.",
+      "required": true,
       "sensitive": true
     }
   }
