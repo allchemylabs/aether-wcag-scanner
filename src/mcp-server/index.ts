@@ -58,14 +58,36 @@ import { registerSubmitFeedback } from './tools/submit-feedback.ts';
 import { shutdownScanner } from './services/scanner-manager.ts';
 import { getInsightApiUrl, isLoopbackUrl } from '../concepts/a11y-scanner/insight-client.ts';
 
-const server = new McpServer({
-  name: 'aether-wcag-scanner',
-  version: '1.0.0',
-  description:
-    'WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. ' +
-    'Scans live URLs via Playwright + axe-core across viewports, returns ' +
-    'violations paired with corpus-backed fixes and WCAG technique references.',
-});
+/**
+ * Server instructions, delivered to every MCP client in the `initialize` result.
+ * Claude Code additionally ships the /wcag-scan skill; other clients (Codex, Cursor,
+ * Windsurf, Gemini CLI …) only see this text and the tool descriptions, so the
+ * workflow rules the skill enforces are restated here. Keep in sync with
+ * skills/wcag-scan/SKILL.md and docs/marketplace-draft/AGENTS.md.
+ */
+export const SERVER_INSTRUCTIONS = [
+  'Aether scans web pages for WCAG 2.1 AA violations with a real browser (Playwright + axe-core) and returns grounded, browser-verified fix suggestions.',
+  '',
+  'WHEN TO USE: for any question about the accessibility, a11y or WCAG conformance of a URL, call aether_scan_and_fix FIRST. Do not fetch the page HTML yourself and reason about it; fetched HTML misses rendered state, contrast, keyboard behaviour and SPA routes.',
+  '',
+  'WORKFLOW: (1) aether_scan_and_fix with the URL (default maxFixes:10 also generates fixes; use maxFixes:0 only when the user explicitly wants a scan with no fixes). For an HTML snippet use aether_check_html. For a single-page app pass the `spa` block. (2) Present violations grouped by severity: critical, serious, moderate, minor. (3) fixHtml is a SUGGESTION; the tools never modify files. If you can edit the source, apply the fix and then verify; if the URL is a remote site you do not own, present fixHtml as a recommendation and say the developer must apply it. (4) Verify with the `verification` block already attached to each fix, or call aether_verify_fix; report targetCleared, newViolations, resolvedViolations and complianceDelta verbatim. (5) Never say something is "fixed" unless you changed source AND verification shows targetCleared:true.',
+  '',
+  'HONESTY: relay tool output as-is. Do not invent quality or confidence claims. Each fix carries source (rag = cloud engine, template = local fallback), fixTier, confidence.tier (grounded | best_effort | abstain) and rationale; show them. An abstain means no grounded fix exists; say so rather than inventing one. A `note` on a verification (e.g. contrast cannot be measured on an isolated snippet) must be relayed.',
+  '',
+  'KEY: ALLCHEMY_API_KEY enables cloud fixes (source:rag). Without it the scanner still runs and returns template fixes. Keys: https://beta.allchemylabs.ai',
+].join('\n');
+
+const server = new McpServer(
+  {
+    name: 'aether-wcag-scanner',
+    version: '1.0.1',
+    description:
+      'WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. ' +
+      'Scans live URLs via Playwright + axe-core across viewports, returns ' +
+      'violations paired with corpus-backed fixes and WCAG technique references.',
+  },
+  { instructions: SERVER_INSTRUCTIONS },
+);
 
 // Hero tool — scan (single page or SPA) + RAG-powered fixes
 registerScanAndFix(server);

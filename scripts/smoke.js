@@ -23,7 +23,7 @@ child.stdout.on('data', (chunk) => {
     const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
     if (!line) continue;
     let msg; try { msg = JSON.parse(line); } catch { continue; }
-    if (msg.id === 1) { send({ jsonrpc: '2.0', method: 'notifications/initialized' }); send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }); }
+    if (msg.id === 1) { if (!msg.result?.instructions?.includes('aether_scan_and_fix')) { console.error('smoke: initialize result has no server instructions'); child.kill(); process.exit(1); } send({ jsonrpc: '2.0', method: 'notifications/initialized' }); send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }); }
     if (msg.id === 2) {
       const names = (msg.result?.tools ?? []).map((t) => t.name).sort();
       clearTimeout(timer); child.kill();

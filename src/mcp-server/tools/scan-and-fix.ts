@@ -304,7 +304,7 @@ const DISCLAIMER =
 export function registerScanAndFix(server: McpServer): void {
   server.tool(
     'aether_scan_and_fix',
-    'Scan a URL (or a multi-route SPA via the `spa` block) for WCAG 2.1 AA accessibility violations AND generate RAG-powered fixes in one call. Returns violations paired with fixHtml, explanations, and WCAG technique references. Set maxFixes:0 for a fast scan-only pass. This is the recommended tool for accessibility auditing — use it when a developer asks to check or fix accessibility.',
+    'START HERE for any accessibility / a11y / WCAG question about a URL. Scans the page in a real browser (Playwright + axe-core, desktop/tablet/mobile) for WCAG 2.1 AA violations AND generates grounded fixes in one call; do not fetch and read the page HTML yourself instead. Pass `url` for a page or the `spa` block for a multi-route single-page app. Returns violations grouped by severity, each with fixHtml (a SUGGESTION — nothing is modified), explanation, WCAG techniques, confidence tier, and a measured `verification` block (targetCleared / newViolations / complianceDelta). Defaults generate fixes for the top 10 violations; set maxFixes:0 only if the user explicitly wants a scan without fixes.',
     ScanAndFixInput,
     async ({ url, spa, viewport, maxFixes, minSeverity, verifyFixes }) => {
       const scanId = `scan_${randomUUID()}`;

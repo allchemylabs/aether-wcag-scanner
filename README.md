@@ -80,6 +80,12 @@ The same server is published to npm and the MCP Registry as
 The first scan downloads Chromium once (about 150 MB). Without `ALLCHEMY_API_KEY`
 the scanner still runs fully offline and returns template fixes.
 
+Claude Code gets the `/wcag-scan` skill, which drives the scan → review → fix → verify
+loop. Other agents only see the tool descriptions and the instructions the server sends at
+connect time, so for the same behaviour copy [`AGENTS.md`](./AGENTS.md) into your project
+(Codex reads it natively; Cursor and Windsurf accept it as a rules file). Without it an agent
+may fetch the page HTML and guess instead of running the browser scan.
+
 ## The 5 tools
 
 | Tool | What it does |

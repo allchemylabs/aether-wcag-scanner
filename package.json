@@ -1,6 +1,6 @@
 {
   "name": "@allchemylabs/aether-wcag-scanner",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "mcpName": "io.github.allchemylabs/aether-wcag-scanner",
   "description": "WCAG 2.1 AA accessibility scanner (Playwright + axe-core) with grounded, browser-verified fixes. MCP server for Claude Code and any MCP client; also a Claude Code plugin.",
   "keywords": [
@@ -39,7 +39,8 @@
     "server.json",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "AGENTS.md"
   ],
   "scripts": {
     "start": "node scripts/start.js",
