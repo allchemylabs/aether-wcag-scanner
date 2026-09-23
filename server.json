@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.allchemylabs/aether-wcag-scanner",
+  "description": "WCAG 2.1 AA accessibility scanner (Playwright + axe-core) with grounded, browser-verified fixes.",
+  "title": "Aether WCAG Scanner",
+  "websiteUrl": "https://allchemylabs.ai/beta/",
+  "repository": {
+    "url": "https://github.com/allchemylabs/aether-wcag-scanner",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@allchemylabs/aether-wcag-scanner",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ALLCHEMY_API_KEY",
+          "description": "Beta API key from https://beta.allchemylabs.ai (optional: without it the scanner runs fully offline with template fixes)",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

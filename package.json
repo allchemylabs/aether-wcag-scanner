@@ -1,7 +1,19 @@
 {
-  "name": "aether-wcag-scanner",
+  "name": "@allchemylabs/aether-wcag-scanner",
   "version": "1.0.0",
-  "description": "WCAG 2.1 AA accessibility scanner with RAG-powered fixes, packaged as a Claude Code MCP plugin and standalone CLI.",
+  "mcpName": "io.github.allchemylabs/aether-wcag-scanner",
+  "description": "WCAG 2.1 AA accessibility scanner (Playwright + axe-core) with grounded, browser-verified fixes. MCP server for Claude Code and any MCP client; also a Claude Code plugin.",
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "axe-core",
+    "playwright",
+    "mcp",
+    "mcp-server",
+    "claude-code",
+    "claude-plugin"
+  ],
   "type": "module",
   "license": "MIT",
   "author": "Allchemy Labs",
@@ -10,12 +22,34 @@
     "type": "git",
     "url": "https://github.com/allchemylabs/aether-wcag-scanner.git"
   },
-  "bin": {
-    "aether-wcag-scanner": "src/mcp-server/index.ts"
+  "bugs": {
+    "url": "https://github.com/allchemylabs/aether-wcag-scanner/issues"
   },
+  "main": "dist/mcp-server/index.js",
+  "bin": {
+    "aether-wcag-scanner": "dist/mcp-server/index.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "hooks",
+    ".claude-plugin",
+    ".mcp.json",
+    "scripts",
+    "server.json",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "scripts": {
     "start": "node scripts/start.js",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "smoke": "node scripts/smoke.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.11.0",

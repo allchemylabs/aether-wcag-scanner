@@ -60,6 +60,26 @@ in the `.env` of the project you are scanning.
 
 ---
 
+## Use it outside Claude Code (any MCP client)
+
+The same server is published to npm and the MCP Registry as
+`@allchemylabs/aether-wcag-scanner`. Any MCP client that speaks stdio can run it:
+
+```json
+{
+  "mcpServers": {
+    "aether-wcag-scanner": {
+      "command": "npx",
+      "args": ["-y", "@allchemylabs/aether-wcag-scanner"],
+      "env": { "ALLCHEMY_API_KEY": "<your beta key>" }
+    }
+  }
+}
+```
+
+The first scan downloads Chromium once (about 150 MB). Without `ALLCHEMY_API_KEY`
+the scanner still runs fully offline and returns template fixes.
+
 ## The 5 tools
 
 | Tool | What it does |

@@ -1,0 +1,43 @@
+# Publish server.json to the official MCP Registry (registry.modelcontextprotocol.io).
+#
+# Auth is GitHub OIDC: the workflow's repository identity (allchemylabs/…) grants the
+# io.github.allchemylabs/* namespace. The interactive `mcp-publisher login github` device
+# flow cannot do this for org namespaces because the registry's GitHub App is not installed
+# on the org (registry issues #1527/#1649). Run from the Actions tab (workflow_dispatch) after
+# the npm package for the same version is live, or let a v* tag trigger it.
+name: Publish to MCP Registry
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the npm package for this version exists
+        run: |
+          PKG=$(jq -r '.packages[0].identifier' server.json); VER=$(jq -r '.version' server.json)
+          echo "expecting $PKG@$VER on npm"
+          npm view "$PKG@$VER" version
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher --help | head -1
+
+      - name: Validate server.json
+        run: ./mcp-publisher validate
+
+      - name: Authenticate (OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        run: ./mcp-publisher publish
