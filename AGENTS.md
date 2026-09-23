@@ -28,8 +28,11 @@ which the browser scan measures.
 4. **Verify.** Read the `verification` block attached to each fix, or call `aether_verify_fix`
    (URL mode re-scans a live page; snippet mode diffs original vs fixed HTML). Report
    `targetCleared`, `newViolations`, `resolvedViolations` and `complianceDelta` verbatim.
-5. **Report.** Measured facts only: violations found, which fixes cleared their target, any
-   regressions, WCAG criteria addressed, and anything flagged for manual review.
+5. **Report.** The fixes are the deliverable, not the counts. Include every severity. For each
+   generated fix show the target element, the change in one line (for example "background
+   #00a2c7 → #00819f" or "add aria-label"), `source`, `confidence.tier`, and the verification
+   fields or note. Group fixes that share one root cause (one colour token, one landmark) and say
+   so. Then: WCAG criteria addressed and anything flagged for manual review.
 
 ## Honesty rules
 

@@ -72,6 +72,8 @@ export const SERVER_INSTRUCTIONS = [
   '',
   'WORKFLOW: (1) aether_scan_and_fix with the URL (default maxFixes:10 also generates fixes; use maxFixes:0 only when the user explicitly wants a scan with no fixes). For an HTML snippet use aether_check_html. For a single-page app pass the `spa` block. (2) Present violations grouped by severity: critical, serious, moderate, minor. (3) fixHtml is a SUGGESTION; the tools never modify files. If you can edit the source, apply the fix and then verify; if the URL is a remote site you do not own, present fixHtml as a recommendation and say the developer must apply it. (4) Verify with the `verification` block already attached to each fix, or call aether_verify_fix; report targetCleared, newViolations, resolvedViolations and complianceDelta verbatim. (5) Never say something is "fixed" unless you changed source AND verification shows targetCleared:true.',
   '',
+  'REPORT: the fixes are the deliverable, not the counts. Include every severity (critical, serious, moderate, minor). For EACH generated fix show: the target element, the change in one line (e.g. "background #00a2c7 → #00819f" or "add aria-label"), source (rag/template), confidence.tier, and the verification fields (targetCleared, newViolations, complianceDelta) or the verification note. Group fixes that share one root cause (e.g. one colour token) and say so.',
+  '',
   'HONESTY: relay tool output as-is. Do not invent quality or confidence claims. Each fix carries source (rag = cloud engine, template = local fallback), fixTier, confidence.tier (grounded | best_effort | abstain) and rationale; show them. An abstain means no grounded fix exists; say so rather than inventing one. A `note` on a verification (e.g. contrast cannot be measured on an isolated snippet) must be relayed.',
   '',
   'KEY: ALLCHEMY_API_KEY enables cloud fixes (source:rag). Without it the scanner still runs and returns template fixes. Keys: https://beta.allchemylabs.ai',
@@ -80,7 +82,7 @@ export const SERVER_INSTRUCTIONS = [
 const server = new McpServer(
   {
     name: 'aether-wcag-scanner',
-    version: '1.0.1',
+    version: '1.0.2',
     description:
       'WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. ' +
       'Scans live URLs via Playwright + axe-core across viewports, returns ' +
