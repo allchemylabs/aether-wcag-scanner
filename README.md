@@ -11,23 +11,18 @@ HTML, the relevant WCAG success criteria, and technique code examples.
 
 ## Why it's different
 
-Plain Claude Code can *guess* at accessibility issues by reading your markup.
-This plugin actually **runs your page** and grounds every fix in the WCAG spec.
+An AI coding agent working from markup alone has to infer what a page does. Aether runs
+the page in a real browser, measures it with axe-core, and grounds every suggested fix in
+the WCAG spec, so the agent is working from measurements rather than inference.
 
-| | Plain Claude Code | Aether (offline) | Aether (with API key) |
+| | Coding agent alone | Aether, offline | Aether, with API key |
 |---|---|---|---|
-| Detection | Eyeballs the HTML it can see | Real browser + axe-core, all viewports | Real browser + axe-core, all viewports |
-| Coverage | Misses computed/runtime issues | Catches contrast, ARIA, focus, names | Same |
-| Fixes | Generic suggestions | Built-in fix templates | RAG-backed fixes + WCAG technique code |
-| Grounding | None | Rule IDs + severity | Cited success criteria + techniques |
-| Works offline | n/a | Yes | Falls back to offline automatically |
-
-The scanner **degrades gracefully**: with no API key (or when offline or
-rate-limited) it still returns template-based fixes for every violation. Add an
-API key and the same violations come back with corpus-grounded fixes and WCAG
-technique snippets.
-
----
+| **How it looks at the page** | Reads the HTML it is given | Renders the page in Chromium at desktop, tablet and mobile widths and runs axe-core | Same |
+| **What it can measure** | Structure visible in the markup | What axe measures on the rendered page: contrast, accessible names, ARIA usage, focusable regions, landmarks | Same |
+| **Fix suggestions** | From the model's general knowledge | Deterministic templates for the common rules | Templates first, then WCAG-corpus examples, then a model; every cited technique passes a grounding check |
+| **How fixes are checked** | Not checked unless you set that up | axe re-run on the fixed element; reports what cleared and what regressed | Same |
+| **What each fix cites** | Whatever the model recalls | The axe rule and its severity | The WCAG success criteria and techniques, with rejected candidates shown |
+| **Network** | Depends on the agent | None; runs entirely on your machine | Fix requests go to the hosted engine; falls back to offline templates when it is unreachable |
 
 ## Install
 
