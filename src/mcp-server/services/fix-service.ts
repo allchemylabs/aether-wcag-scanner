@@ -277,6 +277,17 @@ export async function explainViolation(ruleId: string, scanId?: string): Promise
  * Parse an InsightApiError into a RateLimitInfo object.
  * Returns undefined for non-rate-limit/non-auth errors.
  */
+/** Keyless users (e.g. a bare `npx` install) get a nudge, not "Invalid API key". */
+export const NO_KEY_NOTICE =
+  'Cloud fixes need a beta key: get one at https://beta.allchemylabs.ai (sign in with GitHub). ' +
+  'Until then these are local template fixes.';
+
+export function authFailureMessage(): string {
+  return process.env.ALLCHEMY_API_KEY
+    ? 'Invalid API key. Set ALLCHEMY_API_KEY with a valid key from https://beta.allchemylabs.ai (sign in with GitHub to get or rotate one)'
+    : NO_KEY_NOTICE;
+}
+
 function parseApiError(err: unknown): RateLimitInfo | undefined {
   if (!(err instanceof InsightApiError)) return undefined;
 
@@ -314,7 +325,7 @@ function parseApiError(err: unknown): RateLimitInfo | undefined {
   if (err.status === 401) {
     return {
       tier: 'none',
-      message: 'Invalid API key. Set ALLCHEMY_API_KEY with a valid key from https://beta.allchemylabs.ai (sign in with GitHub to get or rotate one)',
+      message: authFailureMessage(),
     };
   }
 

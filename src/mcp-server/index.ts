@@ -76,13 +76,13 @@ export const SERVER_INSTRUCTIONS = [
   '',
   'HONESTY: relay tool output as-is. Do not invent quality or confidence claims. Each fix carries source (rag = cloud engine, template = local fallback), fixTier, confidence.tier (grounded | best_effort | abstain) and rationale; show them. An abstain means no grounded fix exists; say so rather than inventing one. A `note` on a verification (e.g. contrast cannot be measured on an isolated snippet) must be relayed.',
   '',
-  'KEY: ALLCHEMY_API_KEY enables cloud fixes (source:rag). Without it the scanner still runs and returns template fixes. Keys: https://beta.allchemylabs.ai',
+  'KEY: ALLCHEMY_API_KEY enables cloud fixes (source:rag). Without it the scanner still runs and returns template fixes. Keys: https://beta.allchemylabs.ai. If a result carries a `notice` (missing/invalid key, rate limit), show it to the user verbatim.',
 ].join('\n');
 
 const server = new McpServer(
   {
     name: 'aether-wcag-scanner',
-    version: '1.0.2',
+    version: '1.0.3',
     description:
       'WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. ' +
       'Scans live URLs via Playwright + axe-core across viewports, returns ' +

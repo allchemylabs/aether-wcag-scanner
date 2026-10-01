@@ -95,6 +95,9 @@ Report the measured delta verbatim: `targetCleared`, any `newViolations`
 carries a `note` (e.g. snippet mode can't reproduce color-contrast), relay it
 and prefer a URL re-scan.
 
+If a scan or fix result carries a `notice` (missing/invalid API key, rate limit),
+show it to the user verbatim.
+
 ## 5. Report
 
 Summarize using measured facts only:

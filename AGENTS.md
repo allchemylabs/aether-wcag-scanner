@@ -50,5 +50,6 @@ which the browser scan measures.
 ## Setup reminder
 
 `ALLCHEMY_API_KEY` (from https://beta.allchemylabs.ai) enables cloud fixes (`source: "rag"`).
-Without it the scanner still runs and returns template fixes. The first scan downloads
+Without it the scanner still runs and returns template fixes. If a result carries a `notice`
+(missing/invalid key, rate limit), show it to the user verbatim. The first scan downloads
 Chromium once.
