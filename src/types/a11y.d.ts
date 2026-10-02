@@ -267,6 +267,11 @@ export interface PageScanResult {
   scanDate: string;
   success: boolean;
   error?: string;
+  /** Why the page could not be scanned: 'bot_gate' | 'http_<status>'. */
+  reason?: string;
+  /** true when at least one viewport failed: results cover fewer screens. */
+  partial?: boolean;
+  viewportErrors?: Array<{ viewport: string; error: string }>;
   insights?: InsightsResult;
   insightsError?: string;
   viewportResults?: ViewportResult[];

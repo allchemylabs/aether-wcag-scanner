@@ -82,7 +82,7 @@ export const SERVER_INSTRUCTIONS = [
 const server = new McpServer(
   {
     name: 'aether-wcag-scanner',
-    version: '1.0.4',
+    version: '1.0.5',
     description:
       'WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. ' +
       'Scans live URLs via Playwright + axe-core across viewports, returns ' +

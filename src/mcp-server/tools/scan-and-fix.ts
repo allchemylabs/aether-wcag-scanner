@@ -360,7 +360,15 @@ async function runSinglePage(
   if (!result || !result.success) {
     return {
       content: [
-        { type: 'text' as const, text: JSON.stringify({ error: result?.error ?? 'Scan failed', url }) },
+        {
+          type: 'text' as const,
+          text: JSON.stringify({
+            error: result?.error ?? 'Scan failed',
+            url,
+            ...(result?.reason ? { reason: result.reason, unscannable: true } : {}),
+            ...(result?.viewportErrors ? { viewportErrors: result.viewportErrors } : {}),
+          }),
+        },
       ],
       isError: true,
     };
@@ -375,7 +383,12 @@ async function runSinglePage(
 
   const nodeEntries = toNodeEntries(result.violations, minLevel);
   const fixEntries = await generateFixes(nodeEntries, maxFixes, verifyFixes, scanId, url);
-  const { ragStatus, notice } = ragSummary(fixEntries);
+  const { ragStatus, notice: ragNotice } = ragSummary(fixEntries);
+  const partialNotice = result.partial && result.viewportErrors?.length
+    ? `Partial scan: the ${result.viewportErrors.map((e) => e.viewport).join(' and ')} viewport failed ` +
+      `(${result.viewportErrors.map((e) => e.error).join('; ')}), so these results do not cover every screen size.`
+    : undefined;
+  const notice = [partialNotice, ragNotice].filter(Boolean).join(' ') || undefined;
 
   const verifiedCount = fixEntries.filter((e) => e.verification?.targetCleared).length;
   const unverifiedFixCount = fixEntries.filter((e) => !e.verification?.targetCleared).length;
@@ -386,6 +399,7 @@ async function runSinglePage(
     scanDate: result.scanDate,
     statistics: stats,
     totalViolations: result.violations.length,
+    ...(result.partial ? { partial: true, viewportErrors: result.viewportErrors } : {}),
     viewportBreakdown: viewportResults.map((vr) => ({
       viewport: vr.viewport,
       width: vr.width,

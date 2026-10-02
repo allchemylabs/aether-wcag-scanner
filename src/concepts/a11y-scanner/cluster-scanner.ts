@@ -12,7 +12,7 @@ import { captureNodeLayouts } from './node-layout.ts';
 import { captureNodeContext } from './node-context.ts';
 import { getChromiumLaunchArgs } from './browser-args.ts';
 import { assertScannableUrl } from './url-guard.ts';
-import { BotGateError, matchBotGate, type BotGateSignals } from './bot-gate.ts';
+import { BotGateError, UnscannableError, matchBotGate, unscannableStatus, type BotGateSignals } from './bot-gate.ts';
 
 /**
  * Per-scan options. Kept as a parameter (never instance state) because the MCP
@@ -158,7 +158,10 @@ export class ClusterScanner {
    * First attempt: waitUntil 'domcontentloaded', 30s timeout.
    * Retry: waitUntil 'commit' (first bytes received), 30s timeout.
    */
-  private async navigateWithRetry(page: import('playwright').Page, url: string): Promise<void> {
+  private async navigateWithRetry(
+    page: import('playwright').Page,
+    url: string,
+  ): Promise<import('playwright').Response | null> {
     const attempts = [
       { waitUntil: 'domcontentloaded' as const, timeout: 30000 },
       { waitUntil: 'commit' as const, timeout: 30000 },
@@ -166,8 +169,7 @@ export class ClusterScanner {
 
     for (let i = 0; i < attempts.length; i++) {
       try {
-        await page.goto(url, attempts[i]);
-        return;
+        return await page.goto(url, attempts[i]);
       } catch (err) {
         if (i < attempts.length - 1) {
           console.warn(`Navigation to ${url} failed (attempt ${i + 1}), retrying: ${(err as Error).message}`);
@@ -175,7 +177,7 @@ export class ClusterScanner {
           throw err;
         }
       }
-    }
+    }    return null; // unreachable: the last attempt either returns or throws
   }
 
   /**
@@ -245,8 +247,9 @@ export class ClusterScanner {
         title: document.title || '',
         text: document.body ? document.body.innerText : '',
         htmlLength: document.documentElement.innerHTML.length,
-        challengePlatform: !!(window._cf_chl_opt
-          || document.querySelector('#challenge-form, script[src*="/cdn-cgi/challenge-platform/"]')),
+        challengePlatform: !!(window._cf_chl_opt || window.__cf_chl_opt
+          || document.querySelector('#challenge-form, #cf-browser-verification, [id^="cf-chl"], '
+            + 'script[src*="/cdn-cgi/challenge-platform/"]')),
       }))()`)) as BotGateSignals;
       return matchBotGate(signals);
     } catch {
@@ -267,7 +270,14 @@ export class ClusterScanner {
     try {
       const page = await context.newPage();
       try {
-        await this.navigateWithRetry(page, url);
+        // Track the status of the LAST main-frame navigation: a challenge that
+        // clears itself reloads with 200, and redirects end on the real page.
+        let navStatus: number | null = null;
+        page.on('response', (r) => {
+          if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) navStatus = r.status();
+        });
+        const navResponse = await this.navigateWithRetry(page, url);
+        navStatus ??= navResponse?.status() ?? null;
 
         // Wait for delayed redirects to settle (e.g. Amazon 202 → self-redirect)
         await this.waitForNavigationsToSettle(page);
@@ -282,6 +292,8 @@ export class ClusterScanner {
         if (captchaMarker) {
           throw new BotGateError(captchaMarker, new URL(url).host);
         }
+        const statusError = unscannableStatus(navStatus, new URL(url).host);
+        if (statusError) throw statusError;
 
         await this.waitForDomStable(page);
 
@@ -399,8 +411,8 @@ export class ClusterScanner {
       // Shared across viewports so a violation is screenshotted once, at the
       // first viewport it appears in (aligned with mergeViolations() dedup).
       const captured = new Set<string>();
-      const viewportErrors: string[] = [];
-      let botGate: BotGateError | undefined;
+      const viewportErrors: Array<{ viewport: string; error: string }> = [];
+      let unscannable: UnscannableError | undefined;
 
       for (const vp of VIEWPORTS) {
         try {
@@ -423,11 +435,11 @@ export class ClusterScanner {
         } catch (err) {
           console.warn(`  [${vp.label}] scan failed: ${(err as Error).message}`);
           // The same gate answers every viewport; don't spend ~20s per retry.
-          if (err instanceof BotGateError) {
-            botGate = err;
+          if (err instanceof UnscannableError) {
+            unscannable = err;
             break;
           }
-          viewportErrors.push(`[${vp.label}] ${(err as Error).message}`);
+          viewportErrors.push({ viewport: vp.label, error: (err as Error).message });
           // Continue with remaining viewports
         }
       }
@@ -438,9 +450,11 @@ export class ClusterScanner {
           violations: [],
           scanDate: new Date().toISOString(),
           success: false,
-          error: botGate
-            ? botGate.message
-            : `All viewport scans failed${viewportErrors.length ? `: ${viewportErrors.join('; ')}` : ''}`,
+          error: unscannable
+            ? unscannable.message
+            : `All viewport scans failed: ${viewportErrors.map((e) => `[${e.viewport}] ${e.error}`).join('; ')}`,
+          ...(unscannable && { reason: unscannable.reason }),
+          ...(viewportErrors.length > 0 && { viewportErrors }),
         };
       }
 
@@ -455,6 +469,9 @@ export class ClusterScanner {
         viewportResults,
         scanDate: new Date().toISOString(),
         success: true,
+        // Issue #14: a scan missing a viewport must say so — never a silent
+        // "complete" result built from fewer screens than were asked for.
+        ...(viewportErrors.length > 0 && { partial: true, viewportErrors }),
         ...(combinedError && { error: combinedError }),
         ...(uiAutomationResults && { uiAutomationResults }),
       };

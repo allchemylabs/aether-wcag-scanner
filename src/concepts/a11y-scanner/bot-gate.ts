@@ -60,14 +60,49 @@ export function matchBotGate(s: BotGateSignals): string | null {
   return null;
 }
 
-/** Thrown by a viewport scan that hit a bot gate; the message is user-facing. */
-export class BotGateError extends Error {
+/**
+ * The page the browser ended up on is not the site's real content, so any
+ * axe result would be meaningless. Every viewport would hit the same wall, so
+ * the scan stops and reports this instead of violations. Message is user-facing.
+ */
+export class UnscannableError extends Error {
+  constructor(public readonly reason: string, message: string) {
+    super(message);
+    this.name = 'UnscannableError';
+  }
+}
+
+const NEXT_STEP =
+  'Scan a page you control instead (localhost or a staging URL), or ask the site owner to allow-list the scanner.';
+
+/** A bot-protection interstitial was detected in the rendered page. */
+export class BotGateError extends UnscannableError {
   constructor(public readonly marker: string, host: string) {
     super(
+      'bot_gate',
       `Blocked by bot protection: ${host} served a security-verification page to the automated browser ` +
-        `(matched "${marker}"), so no accessibility results were produced for this site. ` +
-        'Scan a page you control instead (localhost or a staging URL), or ask the site owner to allow-list the scanner.',
+        `(matched "${marker}"), so no accessibility results were produced for this site. ${NEXT_STEP}`,
     );
     this.name = 'BotGateError';
   }
+}
+
+/** Statuses bot walls and rate limiters answer with. */
+const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
+
+/**
+ * Issue #14: the cheapest vendor-agnostic signal that the browser is not
+ * looking at the real page. Any 4xx/5xx final navigation is unscannable; null
+ * (no response, e.g. a file:// or about: page) and 2xx/3xx are fine.
+ */
+export function unscannableStatus(status: number | null | undefined, host: string): UnscannableError | null {
+  if (status == null || status < 400) return null;
+  const why = BLOCKING_STATUSES.has(status)
+    ? ' (typical of bot protection or rate limiting)'
+    : status >= 500 ? ' (server error)' : '';
+  return new UnscannableError(
+    `http_${status}`,
+    `Unscannable: ${host} answered HTTP ${status}${why}, so the browser was not shown the real page and no ` +
+      `accessibility results were produced. ${NEXT_STEP}`,
+  );
 }
