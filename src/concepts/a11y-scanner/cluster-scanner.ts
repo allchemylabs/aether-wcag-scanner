@@ -12,6 +12,7 @@ import { captureNodeLayouts } from './node-layout.ts';
 import { captureNodeContext } from './node-context.ts';
 import { getChromiumLaunchArgs } from './browser-args.ts';
 import { assertScannableUrl } from './url-guard.ts';
+import { BotGateError, matchBotGate, type BotGateSignals } from './bot-gate.ts';
 
 /**
  * Per-scan options. Kept as a parameter (never instance state) because the MCP
@@ -240,21 +241,14 @@ export class ClusterScanner {
    */
   private async detectCaptcha(page: import('playwright').Page): Promise<string | null> {
     try {
-      const result = await page.evaluate(`(() => {
-        var html = document.documentElement.innerHTML;
-        if (html.length > 50000) return null;
-        var text = (document.body ? document.body.innerText : '').toLowerCase();
-        var markers = ['validatecaptcha', 'automated access', 'unusual traffic',
-                       'verify you are a human', 'press & hold',
-                       'click the button below to continue',
-                       'please verify you are a human',
-                       'are not a robot', 'bot detection'];
-        for (var i = 0; i < markers.length; i++) {
-          if (text.indexOf(markers[i]) !== -1) return markers[i];
-        }
-        return null;
-      })()`);
-      return result as string | null;
+      const signals = (await page.evaluate(`(() => ({
+        title: document.title || '',
+        text: document.body ? document.body.innerText : '',
+        htmlLength: document.documentElement.innerHTML.length,
+        challengePlatform: !!(window._cf_chl_opt
+          || document.querySelector('#challenge-form, script[src*="/cdn-cgi/challenge-platform/"]')),
+      }))()`)) as BotGateSignals;
+      return matchBotGate(signals);
     } catch {
       return null;
     }
@@ -278,10 +272,15 @@ export class ClusterScanner {
         // Wait for delayed redirects to settle (e.g. Amazon 202 → self-redirect)
         await this.waitForNavigationsToSettle(page);
 
-        // Detect CAPTCHA / bot-gate pages
-        const captchaMarker = await this.detectCaptcha(page);
+        // Detect CAPTCHA / bot-gate pages. A non-interactive challenge can clear
+        // itself after a few seconds, so give it one chance before refusing.
+        let captchaMarker = await this.detectCaptcha(page);
         if (captchaMarker) {
-          throw new Error(`Bot detection page (matched: "${captchaMarker}"). Site requires a real browser session.`);
+          await this.waitForNavigationsToSettle(page, 8000, 10000);
+          captchaMarker = await this.detectCaptcha(page);
+        }
+        if (captchaMarker) {
+          throw new BotGateError(captchaMarker, new URL(url).host);
         }
 
         await this.waitForDomStable(page);
@@ -400,6 +399,8 @@ export class ClusterScanner {
       // Shared across viewports so a violation is screenshotted once, at the
       // first viewport it appears in (aligned with mergeViolations() dedup).
       const captured = new Set<string>();
+      const viewportErrors: string[] = [];
+      let botGate: BotGateError | undefined;
 
       for (const vp of VIEWPORTS) {
         try {
@@ -421,6 +422,12 @@ export class ClusterScanner {
           });
         } catch (err) {
           console.warn(`  [${vp.label}] scan failed: ${(err as Error).message}`);
+          // The same gate answers every viewport; don't spend ~20s per retry.
+          if (err instanceof BotGateError) {
+            botGate = err;
+            break;
+          }
+          viewportErrors.push(`[${vp.label}] ${(err as Error).message}`);
           // Continue with remaining viewports
         }
       }
@@ -431,7 +438,9 @@ export class ClusterScanner {
           violations: [],
           scanDate: new Date().toISOString(),
           success: false,
-          error: 'All viewport scans failed',
+          error: botGate
+            ? botGate.message
+            : `All viewport scans failed${viewportErrors.length ? `: ${viewportErrors.join('; ')}` : ''}`,
         };
       }
 
