@@ -13,7 +13,9 @@ Allchemy Labs' hosted services, backend infrastructure, models, data, or
 related intellectual property that the client software may communicate with
 or rely upon, including but not limited to:
 
-  - the Allchemy Labs insights/analysis services and their hosted endpoints;
+  - the Allchemy Labs insights/analysis services, their APIs (including the
+    Insights API the client software calls for cloud fixes), and their
+    hosted endpoints;
   - any models, datasets, knowledge bases, embeddings, indexes, prompts, or
     other content used to power those services;
   - the deployment, orchestration, and infrastructure tooling that operates
