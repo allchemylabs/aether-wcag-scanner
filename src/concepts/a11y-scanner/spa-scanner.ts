@@ -51,6 +51,7 @@ import { captureNodeContext } from './node-context.ts';
 import type { ScanOptions } from './cluster-scanner.ts';
 import { getChromiumLaunchArgs } from './browser-args.ts';
 import { assertScannableUrl, assertSameOriginScannable } from './url-guard.ts';
+import { BotGateError, detectBotGateOnPage, trackMainFrameStatus, unscannableStatus } from './bot-gate.ts';
 import type {
   SPAScanConfig,
   SPARouteConfig,
@@ -142,10 +143,30 @@ export class SPAScanner {
     // (spa-config-loader) come straight from a JSON file, so re-check here.
     assertScannableUrl(this.config.entryUrl);
     process.stderr.write(`[spa] Navigating to entry URL ${this.config.entryUrl}\n`);
+    const navStatus = trackMainFrameStatus(page);
     await page.goto(this.config.entryUrl, {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
+
+    // #16: refuse an entry page the browser was never really shown (a bot
+    // wall, a 403/429/5xx). Every route would be scanned on the same wall, so
+    // fail the whole scan as unscannable rather than grading the challenge.
+    // A non-interactive challenge gets one chance to clear itself first.
+    const entryHost = new URL(this.config.entryUrl).host;
+    let gate = await detectBotGateOnPage(page);
+    // Cloudflare reloads its interstitial several times before it clears (or
+    // never does), so keep re-checking for the full window, not one reload.
+    const gateDeadline = Date.now() + 8000;
+    while (gate && Date.now() < gateDeadline) {
+      await page
+        .waitForNavigation({ timeout: Math.max(500, gateDeadline - Date.now()), waitUntil: 'domcontentloaded' })
+        .catch(() => undefined);
+      gate = await detectBotGateOnPage(page);
+    }
+    if (gate) throw new BotGateError(gate, entryHost);
+    const entryStatusError = unscannableStatus(navStatus(), entryHost);
+    if (entryStatusError) throw entryStatusError;
 
     // 2. Auto-detect framework if not specified
     if (this.config.framework === 'generic') {
@@ -414,8 +435,11 @@ export class SPAScanner {
         }
       }, targetUrl);
     } catch {
-      // Fall back to full navigation if evaluate fails
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Fall back to full navigation if evaluate fails. A 4xx/5xx here fails
+      // this route (recorded with its reason), not the whole scan.
+      const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const statusError = unscannableStatus(response?.status(), new URL(targetUrl).host);
+      if (statusError) throw statusError;
     }
   }
 
@@ -522,11 +546,21 @@ export class SPAScanner {
 
     const metrics = this.buildStabilityMetrics(routeResults);
 
+    // #16: a route that failed was not scanned. Say so, and never let failed
+    // routes read as "no violations found".
+    const failed = routeResults.filter((r) => !r.success);
+    const scanned = routeResults.length - failed.length;
+    const routeErrors = failed.map((r) => ({ route: r.routeName || r.route, error: r.error ?? 'Scan failed' }));
+    const failedNote = failed.length
+      ? ` ${failed.length} of ${routeResults.length} route(s) could not be scanned.`
+      : '';
     const summary =
-      stats.total === 0
-        ? `Scanned ${routeResults.length} route(s). No accessibility violations found.`
-        : `Scanned ${routeResults.length} route(s). Found ${stats.total} violation(s) ` +
-          `across ${routesWithIssues} route(s).`;
+      scanned === 0
+        ? `No routes could be scanned (${routeResults.length} attempted).`
+        : stats.total === 0
+          ? `Scanned ${scanned} route(s). No accessibility violations found on them.${failedNote}`
+          : `Scanned ${scanned} route(s). Found ${stats.total} violation(s) ` +
+            `across ${routesWithIssues} route(s).${failedNote}`;
 
     return {
       metadata: {
@@ -541,6 +575,7 @@ export class SPAScanner {
         routesWithIssues,
       },
       summary,
+      ...(failed.length > 0 && { partial: true, routeErrors }),
       routeResults,
       stabilityMetrics: metrics,
     };

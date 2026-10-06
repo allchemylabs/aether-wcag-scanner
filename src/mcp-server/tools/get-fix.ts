@@ -20,7 +20,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getFix, explainViolation } from '../services/fix-service.ts';
 import { verifySnippet } from '../services/verify-service.ts';
 import type { VerificationResult } from '../services/verify-service.ts';
-import { toolError } from './tool-response.ts';
+import { toolError, jsonResult } from './tool-response.ts';
 import { logToolEntry, logError } from '../services/log.ts';
 
 /** Upper bound on any HTML snippet accepted (also verified in a real browser). */
@@ -57,9 +57,7 @@ export function registerGetFix(server: McpServer): void {
         // Explanation mode: no element supplied, return rule-level guidance.
         if (!html) {
           const explanation = await explainViolation(ruleId, scanId);
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify(explanation, null, 2) }],
-          };
+          return jsonResult(explanation, explanation.rateLimitInfo?.message);
         }
 
         // Fix mode: element supplied, generate a concrete fix.
@@ -91,14 +89,7 @@ export function registerGetFix(server: McpServer): void {
           }
         }
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ ...result, ...(verification ? { verification } : {}) }, null, 2),
-            },
-          ],
-        };
+        return jsonResult({ ...result, ...(verification ? { verification } : {}) }, result.rateLimitInfo?.message);
       } catch (err) {
         return toolError(err, { ruleId });
       }

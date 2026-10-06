@@ -106,3 +106,37 @@ export function unscannableStatus(status: number | null | undefined, host: strin
       `accessibility results were produced. ${NEXT_STEP}`,
   );
 }
+
+/**
+ * Collect the signals in a live page and match them. Shared by the cluster
+ * (single-page) and SPA scanners. Never throws: a page mid-navigation reads
+ * as "not a gate" and the caller's status check still applies.
+ */
+export async function detectBotGateOnPage(page: import('playwright').Page): Promise<string | null> {
+  try {
+    const signals = (await page.evaluate(`(() => ({
+      title: document.title || '',
+      text: document.body ? document.body.innerText : '',
+      htmlLength: document.documentElement.innerHTML.length,
+      challengePlatform: !!(window._cf_chl_opt || window.__cf_chl_opt
+        || document.querySelector('#challenge-form, #cf-browser-verification, [id^="cf-chl"], '
+          + 'script[src*="/cdn-cgi/challenge-platform/"]')),
+    }))()`)) as BotGateSignals;
+    return matchBotGate(signals);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Status of the LAST main-frame navigation. A challenge that clears itself
+ * reloads with 200, and redirects end on the real page, so the latest
+ * response is the one that describes what the browser is showing.
+ */
+export function trackMainFrameStatus(page: import('playwright').Page): () => number | null {
+  let status: number | null = null;
+  page.on('response', (r) => {
+    if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) status = r.status();
+  });
+  return () => status;
+}

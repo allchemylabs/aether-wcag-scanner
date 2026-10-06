@@ -35,7 +35,7 @@ Once the official Claude Code marketplace listing is live, you can also install
 it directly from there.
 
 The install prompts for your **Allchemy Labs API key**; paste the key you got
-from [beta.allchemylabs.ai](https://beta.allchemylabs.ai). To set or change it
+from [beta.allchemylabs.ai](https://beta.allchemylabs.ai/?src=readme). To set or change it
 later:
 
 ```

@@ -266,6 +266,92 @@ function findProhibitedAriaAttrs(html: string, failureSummary?: string): string[
   return [...new Set(source.map((a) => a.toLowerCase()))].filter((a) => present.has(a));
 }
 
+// ── aria-roles (#5) ──────────────────────────────────────────────────────────
+// Concrete WAI-ARIA 1.2 roles plus the DPUB-ARIA and Graphics-ARIA roles axe accepts.
+const VALID_ARIA_ROLES = new Set([
+  'alert', 'alertdialog', 'application', 'article', 'banner', 'blockquote', 'button', 'caption',
+  'cell', 'checkbox', 'code', 'columnheader', 'combobox', 'complementary', 'contentinfo',
+  'definition', 'deletion', 'dialog', 'directory', 'document', 'emphasis', 'feed', 'figure', 'form',
+  'generic', 'grid', 'gridcell', 'group', 'heading', 'img', 'insertion', 'link', 'list', 'listbox',
+  'listitem', 'log', 'main', 'marquee', 'math', 'menu', 'menubar', 'menuitem', 'menuitemcheckbox',
+  'menuitemradio', 'meter', 'navigation', 'none', 'note', 'option', 'paragraph', 'presentation',
+  'progressbar', 'radio', 'radiogroup', 'region', 'row', 'rowgroup', 'rowheader', 'scrollbar',
+  'search', 'searchbox', 'separator', 'slider', 'spinbutton', 'status', 'strong', 'subscript',
+  'superscript', 'switch', 'tab', 'table', 'tablist', 'tabpanel', 'term', 'textbox', 'time', 'timer',
+  'toolbar', 'tooltip', 'tree', 'treegrid', 'treeitem',
+  'doc-abstract', 'doc-acknowledgments', 'doc-afterword', 'doc-appendix', 'doc-backlink',
+  'doc-biblioentry', 'doc-bibliography', 'doc-biblioref', 'doc-chapter', 'doc-colophon',
+  'doc-conclusion', 'doc-cover', 'doc-credit', 'doc-credits', 'doc-dedication', 'doc-endnote',
+  'doc-endnotes', 'doc-epigraph', 'doc-epilogue', 'doc-errata', 'doc-example', 'doc-footnote',
+  'doc-foreword', 'doc-glossary', 'doc-glossref', 'doc-index', 'doc-introduction', 'doc-noteref',
+  'doc-notice', 'doc-pagebreak', 'doc-pagefooter', 'doc-pageheader', 'doc-pagelist', 'doc-part',
+  'doc-preface', 'doc-prologue', 'doc-pullquote', 'doc-qna', 'doc-subtitle', 'doc-tip', 'doc-toc',
+  'graphics-document', 'graphics-object', 'graphics-symbol',
+]);
+
+// Abstract roles authors are never allowed to use. Map the ones with an obvious
+// concrete counterpart; the rest have none, so the role is dropped.
+const ABSTRACT_ROLE_MAP: Record<string, string | null> = {
+  command: 'button', input: 'textbox', sectionhead: 'heading', range: 'slider', select: 'listbox',
+  landmark: 'region', composite: null, roletype: null, section: null, structure: null, widget: null,
+  window: null,
+};
+
+// Roles that are only valid inside a specific container (axe: aria-required-parent).
+const REQUIRED_PARENT: Record<string, string> = {
+  menuitem: 'menu / menubar / group', menuitemcheckbox: 'menu / menubar / group',
+  menuitemradio: 'menu / menubar / group', option: 'listbox / group', tab: 'tablist',
+  listitem: 'list / directory', treeitem: 'tree / group', row: 'table / grid / treegrid / rowgroup',
+  cell: 'row', gridcell: 'row', columnheader: 'row', rowheader: 'row',
+};
+
+// Common shorthands seen in the wild. Deliberately NOT mapped: header/footer/aside
+// (banner/contentinfo/complementary carry top-level and uniqueness rules, so a
+// blind rewrite can create new landmark violations) and text (role="text" is a
+// VoiceOver workaround, not a misspelled textbox). Those fall through to removal.
+const ROLE_ALIASES: Record<string, string> = {
+  nav: 'navigation', presentational: 'presentation', image: 'img',
+};
+
+/** Map one role token to a valid ARIA role, or null if there is no safe mapping. */
+function resolveRoleToken(token: string): { role: string; how: string } | null {
+  const t = token.trim().toLowerCase();
+  if (!t) return null;
+  if (VALID_ARIA_ROLES.has(t)) return { role: t, how: token === t ? 'kept' : 'normalised case/whitespace' };
+  const squashed = t.replace(/[-_\s]/g, '');
+  const valid = [...VALID_ARIA_ROLES].find((r) => r.replace(/-/g, '') === squashed);
+  if (valid) return { role: valid, how: `"${token}" is a misspelling of "${valid}"` };
+  if (t in ABSTRACT_ROLE_MAP) {
+    const mapped = ABSTRACT_ROLE_MAP[t];
+    return mapped ? { role: mapped, how: `"${t}" is an abstract role; "${mapped}" is its concrete counterpart` } : null;
+  }
+  if (ROLE_ALIASES[t]) return { role: ROLE_ALIASES[t], how: `"${t}" is not an ARIA role; "${ROLE_ALIASES[t]}" is the closest valid one` };
+  return null;
+}
+
+/** Replace (or remove, when value is null) an attribute, whichever quote style it uses. */
+function setAttribute(html: string, attr: string, value: string | null): string {
+  const re = new RegExp(`\\s+${attr}\\s*=\\s*("[^"]*"|'[^']*'|[^\\s>]+)`, 'i');
+  if (value === null) return html.replace(re, '');
+  const safe = value.replace(/"/g, '&quot;');
+  return re.test(html) ? html.replace(re, ` ${attr}="${safe}"`) : insertAttribute(html, attr, safe);
+}
+
+// ── aria-allowed-attr (#6) ───────────────────────────────────────────────────
+// For the attributes most often misplaced, the roles that DO allow them, so the
+// explanation can say "or add the role, if that is what this element is".
+const ATTR_ALLOWED_ROLES: Record<string, string[]> = {
+  'aria-level': ['heading', 'treeitem', 'row (in a treegrid)'],
+  'aria-checked': ['checkbox', 'radio', 'switch', 'menuitemcheckbox', 'menuitemradio', 'option'],
+  'aria-selected': ['option', 'tab', 'row', 'gridcell', 'treeitem'],
+  'aria-pressed': ['button'],
+  'aria-expanded': ['button', 'link', 'combobox', 'menuitem', 'tab', 'treeitem', 'row'],
+  'aria-valuenow': ['slider', 'spinbutton', 'progressbar', 'meter', 'scrollbar', 'separator (focusable)'],
+  'aria-multiselectable': ['listbox', 'grid', 'tablist', 'tree'],
+  'aria-required': ['textbox', 'combobox', 'listbox', 'checkbox', 'radiogroup', 'spinbutton'],
+  'aria-placeholder': ['textbox', 'searchbox'],
+};
+
 export const FIX_TEMPLATES: Record<string, FixTemplate> = {
 
   'region': {
@@ -614,6 +700,108 @@ export const FIX_TEMPLATES: Record<string, FixTemplate> = {
           removable.length > 0
             ? `Remove the prohibited attribute(s) (${removable.join(', ')}) — this element's role does not support them.`
             : "Remove the prohibited ARIA attribute(s) for this element's implicit or explicit role.",
+      };
+    },
+  },
+
+  'aria-roles': {
+    errorSummary: 'Element has a role attribute that is not a valid ARIA role',
+    generateFix: (html) => {
+      // #5: axe flags a role value that is not a valid concrete role (typo, stray
+      // whitespace, abstract role, or a made-up value). Keep the first token that
+      // maps to a valid role; if none does, remove role so native semantics apply.
+      const raw = getAttributeValue(html, 'role');
+      const tokens = raw.split(/\s+/).filter(Boolean);
+      for (const token of tokens) {
+        const resolved = resolveRoleToken(token);
+        if (resolved) {
+          const dropped = tokens.length > 1 ? ` Dropped the other value(s) (${tokens.filter((x) => x !== token).join(', ')}).` : '';
+          const parent = REQUIRED_PARENT[resolved.role]
+            ? ` Note: role="${resolved.role}" must sit inside an element with role ${REQUIRED_PARENT[resolved.role]}; add that container if it is missing.`
+            : '';
+          return {
+            fixHtml: setAttribute(html, 'role', resolved.role),
+            explanation:
+              `role="${raw}" is not a valid ARIA role. Changed it to role="${resolved.role}": ${resolved.how}.${dropped}${parent} ` +
+              `Check that "${resolved.role}" matches what this element actually does; if it does not, remove the role and use a native element instead.`,
+          };
+        }
+      }
+      // A generic element (div/span) that carries an accessible name needs a role
+      // that permits one; with the role simply removed, axe flags the leftover
+      // aria-label as aria-prohibited-attr. role="group" permits a name and,
+      // unlike region, is not a landmark, so repeated labels (two cards both
+      // named "featured", as in the study) cannot trip landmark-unique.
+      const tag = extractTagName(html);
+      const named = hasAttribute(html, 'aria-label') || hasAttribute(html, 'aria-labelledby');
+      if (named && (tag === 'div' || tag === 'span')) {
+        return {
+          fixHtml: setAttribute(html, 'role', 'group'),
+          explanation:
+            `role="${raw}" is not a valid ARIA role. Replaced it with role="group", which keeps this element's ` +
+            `accessible name valid (a plain <${tag}> may not carry aria-label). If the name adds nothing for ` +
+            'screen-reader users, remove both role and aria-label instead.',
+        };
+      }
+      return {
+        fixHtml: setAttribute(html, 'role', null),
+        explanation:
+          `role="${raw}" is not a valid ARIA role and has no clear valid equivalent, so it was removed and the ` +
+          `element's native semantics apply. If it needs a role, pick one from the WAI-ARIA 1.2 role list that matches its behaviour.`,
+      };
+    },
+  },
+
+  'aria-allowed-attr': {
+    errorSummary: 'Element has ARIA attributes that are not allowed for its role',
+    generateFix: (html, node) => {
+      // #6: axe names the offending attribute(s) in failureSummary, e.g.
+      // 'ARIA attribute is not allowed: aria-level="1"'. Remove exactly those.
+      // Never strip the accessible name (aria-label / aria-labelledby).
+      const flagged = findProhibitedAriaAttrs(html, node?.failureSummary).filter((a) => !NAME_PROVIDING_ARIA.has(a));
+      if (flagged.length === 0) {
+        return {
+          fixHtml: html,
+          explanation:
+            "Remove the ARIA attribute(s) this element's role does not support (axe's message names them), " +
+            'or give the element a role that supports them.',
+        };
+      }
+      let fixed = html;
+      for (const attr of flagged) fixed = setAttribute(fixed, attr, null);
+      const roleNotes = flagged
+        .filter((a) => ATTR_ALLOWED_ROLES[a])
+        .map((a) => `${a} is only allowed with role ${ATTR_ALLOWED_ROLES[a].join(' / ')}`);
+      return {
+        fixHtml: fixed,
+        explanation:
+          `Removed ${flagged.join(', ')}, which ${flagged.length === 1 ? 'is' : 'are'} not allowed on this element's role.` +
+          (roleNotes.length ? ` (${roleNotes.join('; ')}.) If this element really is one of those, add that role and keep the attribute instead.` : ''),
+      };
+    },
+  },
+
+  'label-title-only': {
+    errorSummary: 'Form field is labelled only by its title or aria-describedby',
+    generateFix: (html) => {
+      // #7: a title attribute (or aria-describedby) is not a reliable accessible
+      // name. Promote the title text to aria-label (a single-element edit that is
+      // verifiable in snippet mode) and keep title as the tooltip.
+      const title = getAttributeValue(html, 'title').trim();
+      if (title) {
+        return {
+          fixHtml: setAttribute(html, 'aria-label', title),
+          explanation:
+            `This field's only label is its title ("${title}"), which many screen readers and voice-control tools ` +
+            `do not treat as a reliable name and which sighted users only see on hover. Added aria-label="${title}" and kept ` +
+            'title as the tooltip. Better still, add a visible <label for="…"> with the same text, so everyone can see what the field is for.',
+        };
+      }
+      return {
+        fixHtml: setAttribute(html, 'aria-label', '[Name this field, e.g. "Email address"]'),
+        explanation:
+          'This field has no real label: only an empty title or an aria-describedby description. Added a placeholder aria-label ' +
+          'to replace with the field\'s purpose. Prefer a visible <label for="…">; aria-describedby is for extra hints, not the name.',
       };
     },
   },

@@ -30,7 +30,12 @@ const child = spawn(
   {
     cwd: PLUGIN_ROOT,
     stdio: 'inherit',
-    env: { ...process.env, AETHER_PROJECT_CWD: process.env.AETHER_PROJECT_CWD || process.cwd() },
+    env: {
+      ...process.env,
+      AETHER_PROJECT_CWD: process.env.AETHER_PROJECT_CWD || process.cwd(),
+      // Lets cloud logs tell plugin installs from npx installs (see client-version.ts).
+      AETHER_CLIENT_CHANNEL: 'claude-plugin',
+    },
   },
 );
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {

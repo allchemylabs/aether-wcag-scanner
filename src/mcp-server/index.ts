@@ -22,6 +22,7 @@
 // file first means a scanned repo's .env can fill gaps but can NOT redirect the
 // insights URL or swap the credentials/API key.
 import { config as loadDotenv } from 'dotenv';
+import { CLIENT_VERSION } from '../concepts/a11y-scanner/client-version.ts';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -76,13 +77,15 @@ export const SERVER_INSTRUCTIONS = [
   '',
   'HONESTY: relay tool output as-is. Do not invent quality or confidence claims. Each fix carries source (rag = cloud engine, template = local fallback), fixTier, confidence.tier (grounded | best_effort | abstain) and rationale; show them. An abstain means no grounded fix exists; say so rather than inventing one. A `note` on a verification (e.g. contrast cannot be measured on an isolated snippet) must be relayed.',
   '',
-  'KEY: ALLCHEMY_API_KEY enables cloud fixes (source:rag). Without it the scanner still runs and returns template fixes. Keys: https://beta.allchemylabs.ai. If a result carries a `notice` (missing/invalid key, rate limit), show it to the user verbatim.',
+  'CITATIONS: cite only the WCAG techniques and success criteria the tools returned for that element. If you add one yourself, label it as your own suggestion, not Aether\'s, and never list it alongside Aether\'s grounded citations. Before citing techniques for a violation you have not sent to Aether, call aether_get_fix for it (pass `html`).',
+  '',
+  'KEY: ALLCHEMY_API_KEY enables cloud fixes (source:rag). Without it the scanner still runs and returns template fixes. Keys: https://beta.allchemylabs.ai/?src=plugin-instr. If a tool result ends with a line starting "Notice for the user:" (missing/invalid key, rate limit, partial scan), end your answer to the user with that line, unchanged and including its link, once per session.',
 ].join('\n');
 
 const server = new McpServer(
   {
     name: 'aether-wcag-scanner',
-    version: '1.0.5',
+    version: CLIENT_VERSION,
     description:
       'WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. ' +
       'Scans live URLs via Playwright + axe-core across viewports, returns ' +
@@ -133,7 +136,7 @@ try {
     console.error(
       '[aether] ALLCHEMY_INSIGHT_URL points at cloud but ALLCHEMY_API_KEY is unset — ' +
         'RAG fixes will 401 and fall back to templates. ' +
-        'Get a key at https://beta.allchemylabs.ai and set ALLCHEMY_API_KEY (see README).',
+        'Get a key at https://beta.allchemylabs.ai/?src=stderr and set ALLCHEMY_API_KEY (see README).',
     );
   }
 } catch (err) {

@@ -12,7 +12,7 @@ import { captureNodeLayouts } from './node-layout.ts';
 import { captureNodeContext } from './node-context.ts';
 import { getChromiumLaunchArgs } from './browser-args.ts';
 import { assertScannableUrl } from './url-guard.ts';
-import { BotGateError, UnscannableError, matchBotGate, unscannableStatus, type BotGateSignals } from './bot-gate.ts';
+import { BotGateError, UnscannableError, detectBotGateOnPage, unscannableStatus } from './bot-gate.ts';
 
 /**
  * Per-scan options. Kept as a parameter (never instance state) because the MCP
@@ -242,20 +242,9 @@ export class ClusterScanner {
    * Also requires a small page (< 50KB) since real pages are much larger.
    */
   private async detectCaptcha(page: import('playwright').Page): Promise<string | null> {
-    try {
-      const signals = (await page.evaluate(`(() => ({
-        title: document.title || '',
-        text: document.body ? document.body.innerText : '',
-        htmlLength: document.documentElement.innerHTML.length,
-        challengePlatform: !!(window._cf_chl_opt || window.__cf_chl_opt
-          || document.querySelector('#challenge-form, #cf-browser-verification, [id^="cf-chl"], '
-            + 'script[src*="/cdn-cgi/challenge-platform/"]')),
-      }))()`)) as BotGateSignals;
-      return matchBotGate(signals);
-    } catch {
-      return null;
-    }
+    return detectBotGateOnPage(page);
   }
+
 
   /**
    * Scan a URL at a single viewport. Returns violations or throws on nav failure.

@@ -279,12 +279,13 @@ export async function explainViolation(ruleId: string, scanId?: string): Promise
  */
 /** Keyless users (e.g. a bare `npx` install) get a nudge, not "Invalid API key". */
 export const NO_KEY_NOTICE =
-  'Cloud fixes need a beta key: get one at https://beta.allchemylabs.ai (sign in with GitHub). ' +
-  'Until then these are local template fixes.';
+  "You're getting basic template fixes, which often leave the element unchanged. A beta key unlocks " +
+  "Aether's cloud engine: stronger, context-aware fixes, with every WCAG technique checked against the " +
+  'standard. Get one at https://beta.allchemylabs.ai/?src=notice (sign in with GitHub).';
 
 export function authFailureMessage(): string {
   return process.env.ALLCHEMY_API_KEY
-    ? 'Invalid API key. Set ALLCHEMY_API_KEY with a valid key from https://beta.allchemylabs.ai (sign in with GitHub to get or rotate one)'
+    ? 'Invalid API key. Set ALLCHEMY_API_KEY with a valid key from https://beta.allchemylabs.ai/?src=notice-invalid (sign in with GitHub to get or rotate one)'
     : NO_KEY_NOTICE;
 }
 

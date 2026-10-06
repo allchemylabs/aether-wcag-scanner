@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { UnscannableError } from '../../concepts/a11y-scanner/bot-gate.ts';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { withScanner } from '../services/scanner-manager.ts';
@@ -29,7 +30,7 @@ import { calculateViolationStats } from '../../concepts/a11y-scanner/stats.ts';
 import type { Violation } from '../../types/a11y';
 import { SPAScanner } from '../../concepts/a11y-scanner/spa-scanner.ts';
 import type { SPAScanConfig, SPAFramework, SPARouteConfig } from '../../types/spa-config';
-import { toolError } from './tool-response.ts';
+import { toolError, jsonResult } from './tool-response.ts';
 import { isScannableUrl } from '../../concepts/a11y-scanner/url-guard.ts';
 
 const URL_GUARD_MESSAGE = 'Only http(s) URLs to non-metadata hosts can be scanned';
@@ -340,7 +341,10 @@ export function registerScanAndFix(server: McpServer): void {
           ? await runSpa(spa, minLevel, maxFixes, verifyFixes, scanId)
           : await runSinglePage(url!, viewport, minLevel, maxFixes, verifyFixes, scanId);
       } catch (err) {
-        return toolError(err, { url, spa });
+        // An SPA whose entry page is a bot wall / 4xx-5xx is unscannable (#16):
+        // same shape as the single-page path, so agents report it the same way.
+        const unscannable = err instanceof UnscannableError ? { reason: err.reason, unscannable: true } : {};
+        return toolError(err, { url, spa, ...unscannable });
       }
     },
   );
@@ -422,7 +426,7 @@ async function runSinglePage(
       })),
   };
 
-  return { content: [{ type: 'text' as const, text: JSON.stringify(output, null, 2) }] };
+  return jsonResult(output, notice);
 }
 
 /** Multi-route SPA scan (absorbs the former aether_scan_spa). */
@@ -472,7 +476,13 @@ async function runSpa(
     );
 
     const fixEntries = await generateFixes(nodeEntries, maxFixes, verifyFixes, scanId);
-    const { ragStatus, notice } = ragSummary(fixEntries);
+    const { ragStatus, notice: ragNotice } = ragSummary(fixEntries);
+    const routeErrors = report.routeErrors ?? [];
+    const partialNotice = routeErrors.length
+      ? `Partial scan: ${routeErrors.length} of ${report.routeResults.length} route(s) could not be scanned ` +
+        `(${routeErrors.map((e) => `${e.route}: ${e.error}`).join('; ')}), so these results do not cover the whole app.`
+      : undefined;
+    const notice = [partialNotice, ragNotice].filter(Boolean).join(' ') || undefined;
 
     const verifiedCount = fixEntries.filter((e) => e.verification?.targetCleared).length;
     const unverifiedFixCount = fixEntries.filter((e) => !e.verification?.targetCleared).length;
@@ -485,6 +495,7 @@ async function runSpa(
       routesScanned: report.metadata.routesScanned,
       statistics: report.statistics,
       summary: report.summary,
+      ...(report.partial ? { partial: true, routeErrors } : {}),
       stabilityMetrics: report.stabilityMetrics,
       routeResults: report.routeResults.map((r) => ({
         route: r.route,
@@ -518,7 +529,7 @@ async function runSpa(
       })),
     };
 
-    return { content: [{ type: 'text' as const, text: JSON.stringify(output, null, 2) }] };
+    return jsonResult(output, notice);
   } finally {
     if (scanner) {
       await scanner.cleanup().catch(() => void 0);

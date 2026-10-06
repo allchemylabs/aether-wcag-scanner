@@ -1,4 +1,5 @@
 import { GoogleAuth } from 'google-auth-library';
+import { clientUserAgent } from './client-version.ts';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve as resolvePath, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -251,6 +252,9 @@ async function buildHeaders(scanId?: string): Promise<Record<string, string>> {
   const authHeader = await getIdentityToken(apiUrl);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    // Version + install channel, visible in Cloud Run request logs (incl. 401s)
+    // with no engine change. Replaces Node's bare "node" user agent.
+    'User-Agent': clientUserAgent(),
   };
   if (authHeader) headers['Authorization'] = authHeader;
   if (process.env.ALLCHEMY_API_KEY) headers['X-API-Key'] = process.env.ALLCHEMY_API_KEY;

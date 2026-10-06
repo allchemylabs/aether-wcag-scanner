@@ -95,8 +95,14 @@ Report the measured delta verbatim: `targetCleared`, any `newViolations`
 carries a `note` (e.g. snippet mode can't reproduce color-contrast), relay it
 and prefer a URL re-scan.
 
-If a scan or fix result carries a `notice` (missing/invalid API key, rate limit),
-show it to the user verbatim.
+If a tool result ends with a line starting "Notice for the user:" (missing/invalid
+API key, rate limit, partial scan), end your report with that line, unchanged and
+including its link, once per session.
+
+Cite only the WCAG techniques and success criteria the tools returned for that
+element. If you add one yourself, label it as your own suggestion, not Aether's,
+and never list it alongside Aether's grounded citations. Before citing techniques
+for a violation you have not sent to Aether, call `aether_get_fix` for it.
 
 ## 5. Report
 

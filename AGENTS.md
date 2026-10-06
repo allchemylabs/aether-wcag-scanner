@@ -44,12 +44,17 @@ which the browser scan measures.
   means no grounded fix exists; say so instead of inventing one.
 - Relay any `note` on a verification (for example, contrast cannot be measured on an isolated
   snippet; prefer a URL re-scan).
+- Cite only the WCAG techniques and success criteria the tools returned for that element. If you
+  add one yourself, label it as your own suggestion, not Aether's, and never list it alongside
+  Aether's grounded citations. Before citing techniques for a violation you have not sent to
+  Aether, call `aether_get_fix` for it (pass `html`).
 - Automated scans find a subset of barriers. A clean scan is not WCAG conformance and is not
   legal advice.
 
 ## Setup reminder
 
-`ALLCHEMY_API_KEY` (from https://beta.allchemylabs.ai) enables cloud fixes (`source: "rag"`).
-Without it the scanner still runs and returns template fixes. If a result carries a `notice`
-(missing/invalid key, rate limit), show it to the user verbatim. The first scan downloads
-Chromium once.
+`ALLCHEMY_API_KEY` (from https://beta.allchemylabs.ai/?src=readme) enables cloud fixes
+(`source: "rag"`). Without it the scanner still runs and returns template fixes. If a tool result
+ends with a line starting "Notice for the user:" (missing/invalid key, rate limit, partial scan),
+end your answer to the user with that line, unchanged and including its link, once per session.
+The first scan downloads Chromium once.

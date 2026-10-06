@@ -162,6 +162,9 @@ export interface SPAScanReport {
     routesWithIssues: number;
   };
   summary: string;
+  /** true when at least one route could not be scanned (#16). */
+  partial?: boolean;
+  routeErrors?: Array<{ route: string; error: string }>;
   routeResults: SPARouteResult[];
   stabilityMetrics: SPAStabilityMetrics;
   pipeline?: {
