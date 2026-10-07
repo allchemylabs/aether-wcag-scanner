@@ -1,11 +1,15 @@
 # Aether WCAG Scanner
 
-A Claude Code plugin that finds **WCAG 2.1 AA accessibility violations** and
-returns **ready-to-apply fixes** — not just a list of problems.
+An MCP server for Claude Code, Cursor, Codex and other coding agents that finds
+**WCAG 2.1 AA accessibility violations** and returns **ready-to-apply fixes** —
+not just a list of problems.
 
 It drives a real browser (Playwright + axe-core) across desktop, tablet, and
 mobile viewports, then pairs each violation with a concrete fix: corrected
 HTML, the relevant WCAG success criteria, and technique code examples.
+
+**It works free without a key. For higher quality, contextual fixes, get a beta
+key at [beta.allchemylabs.ai](https://beta.allchemylabs.ai/?src=github)** (sign in with GitHub).
 
 ---
 
@@ -49,9 +53,11 @@ connected right after install, wait a moment and run `/reload-plugins`.
 ### Running without a key
 
 The scanner itself runs locally and works without a key: you get template
-fixes for every violation. The key adds corpus-grounded fixes from the hosted
-insights engine. Set it via the prompt above, or put `ALLCHEMY_API_KEY=<key>`
-in the `.env` of the project you are scanning.
+fixes for every violation. A beta key adds higher quality, contextual fixes
+from the hosted insights engine; get one at
+[beta.allchemylabs.ai](https://beta.allchemylabs.ai/?src=github) (sign in with GitHub).
+Set it via the prompt above, or put `ALLCHEMY_API_KEY=<key>` in the `.env` of
+the project you are scanning.
 
 ---
 
