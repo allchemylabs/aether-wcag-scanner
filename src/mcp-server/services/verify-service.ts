@@ -22,6 +22,7 @@
  */
 
 import { withScanner } from './scanner-manager.ts';
+import { rootTagOf, semanticRegressions } from '../../concepts/a11y-scanner/element-semantics.ts';
 import {
   snapshotViolations,
   diffSnapshots,
@@ -44,6 +45,14 @@ export interface VerificationResult {
   targetRule: string;
   /** MEASURED: the target rule fired before and no longer fires after. */
   targetCleared: boolean;
+  /**
+   * MEASURED (snippet mode): what the fix took away from the element — a control
+   * state (aria-expanded …), keyboard focus, its accessible name, or an
+   * interactive role (#18). Empty = nothing lost; absent = not measured.
+   */
+  regressions?: string[];
+  /** targetCleared AND no regressions. The one flag that means "this fix worked". */
+  verified: boolean;
   /** Regressions the fix introduced (present after, absent before). */
   newViolations: ViolationRef[];
   /** Improvements (present before, absent after). */
@@ -108,8 +117,9 @@ export async function verifySnippet(args: VerifySnippetArgs): Promise<Verificati
 
   return withScanner(async (scanner) => {
     const [before, after] = await Promise.all([
-      scanner.scanHtml(originalHtml),
-      scanner.scanHtml(fixedHtml),
+      scanner.scanHtml(originalHtml, { semantics: true }),
+      // Measure the fixed element that corresponds to the original root, even if the fix wrapped it.
+      scanner.scanHtml(fixedHtml, { semantics: true, semanticsTag: rootTagOf(originalHtml) }),
     ]);
 
     const beforeSnaps = snapshotViolations(before.violations);
@@ -121,8 +131,16 @@ export async function verifySnippet(args: VerifySnippetArgs): Promise<Verificati
     const targetCleared = firedBefore && !firesAfter;
 
     const remaining = afterSnaps.filter((s) => s.ruleId === ruleId).map(toRef);
+    const regressions =
+      before.semantics && after.semantics ? semanticRegressions(before.semantics, after.semantics) : undefined;
 
     const notes: string[] = [];
+    if (regressions && regressions.length > 0) {
+      notes.push(
+        `axe ${targetCleared ? 'no longer flags' : 'still flags'} "${ruleId}", but the fix makes the element worse for assistive technology: ` +
+          `${regressions.join('; ')}. Not counted as verified. Snippet mode cannot test click or keyboard handlers.`,
+      );
+    }
     if (!firedBefore) {
       notes.push(
         `Target rule "${ruleId}" did not fire on the original snippet (snippet mode wraps fragments in a full document, so element-level context may differ). Re-scan the live URL to confirm.`,
@@ -139,6 +157,8 @@ export async function verifySnippet(args: VerifySnippetArgs): Promise<Verificati
       scope: 'snippet' as const,
       targetRule: ruleId,
       targetCleared,
+      ...(regressions ? { regressions } : {}),
+      verified: targetCleared && (regressions?.length ?? 0) === 0,
       newViolations: diff.newViolations.map(toRef),
       resolvedViolations: diff.fixedViolations.map(toRef),
       complianceDelta: {
@@ -180,6 +200,7 @@ export async function verifyUrl(args: VerifyUrlArgs): Promise<VerificationResult
         scope: 'url' as const,
         targetRule: ruleId,
         targetCleared,
+        verified: targetCleared,
         newViolations: diff.newViolations.map(toRef),
         resolvedViolations: diff.fixedViolations.map(toRef),
         complianceDelta: {
@@ -198,6 +219,7 @@ export async function verifyUrl(args: VerifyUrlArgs): Promise<VerificationResult
       scope: 'url' as const,
       targetRule: ruleId,
       targetCleared,
+      verified: targetCleared,
       newViolations: [],
       resolvedViolations: [],
       complianceDelta: {

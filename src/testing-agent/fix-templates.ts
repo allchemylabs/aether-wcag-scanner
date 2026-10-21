@@ -256,11 +256,11 @@ function isLink(html: string): boolean {
   return /^\s*<a\b/i.test(html) && hasAttribute(html, 'href');
 }
 
-function findProhibitedAriaAttrs(html: string, failureSummary?: string): string[] {
+function findProhibitedAriaAttrs(html: string, failureSummary?: string, fallbackToAll = true): string[] {
   const fromSummary = failureSummary
     ? [...failureSummary.matchAll(/\baria-[a-z-]+\b/gi)].map((m) => m[0].toLowerCase())
     : [];
-  const source = fromSummary.length > 0 ? fromSummary : html.match(/\baria-[a-z-]+(?==)/gi) ?? [];
+  const source = fromSummary.length > 0 ? fromSummary : fallbackToAll ? html.match(/\baria-[a-z-]+(?==)/gi) ?? [] : [];
   const present = new Set((html.match(/\baria-[a-z-]+(?==)/gi) ?? []).map((a) => a.toLowerCase()));
   // Only keep attrs that are actually on the element (summary can mention roles too).
   return [...new Set(source.map((a) => a.toLowerCase()))].filter((a) => present.has(a));
@@ -337,7 +337,57 @@ function setAttribute(html: string, attr: string, value: string | null): string 
   return re.test(html) ? html.replace(re, ` ${attr}="${safe}"`) : insertAttribute(html, attr, safe);
 }
 
-// ── aria-allowed-attr (#6) ───────────────────────────────────────────────────
+// ── aria-allowed-attr (#6, #17) ──────────────────────────────────────────────
+// State attributes that only make sense on a control. Deleting them "clears" axe
+// but loses information (a pilot customer's div-button lost aria-expanded and
+// still couldn't take focus, #17), so the template turns the element into the
+// control instead: these states map to the role that carries them.
+const STATE_CONTROL_ROLE: Record<string, string> = {
+  'aria-expanded': 'button',
+  'aria-pressed': 'button',
+  'aria-checked': 'checkbox',
+};
+/** Which of the flagged attributes each control role keeps. */
+const CONTROL_ROLE_ALLOWS: Record<string, Set<string>> = {
+  button: new Set(['aria-expanded', 'aria-pressed']),
+  checkbox: new Set(['aria-checked', 'aria-required', 'aria-readonly']),
+};
+/** Roles that mean "no semantics" — an element carrying one is free to become a control. */
+const NON_SEMANTIC_ROLES = new Set(['generic', 'none', 'presentation']);
+const BLOCK_CONTENT = /<(div|p|ul|ol|li|h[1-6]|table|section|article|form|header|footer|nav|main|aside)\b/i;
+
+/** Attributes axe flagged, from its check data first, then its failure message. */
+function flaggedAllowedAttrs(html: string, node?: ViolationNode): string[] {
+  const data = checkData(node, 'aria-allowed-attr');
+  const fromChecks = (Array.isArray(data) ? data : [])
+    .map((d) => (typeof d === 'string' ? /^\s*(aria-[a-z-]+)/i.exec(d)?.[1]?.toLowerCase() : undefined))
+    .filter((a): a is string => Boolean(a));
+  const present = new Set((html.match(/\baria-[a-z-]+(?==)/gi) ?? []).map((a) => a.toLowerCase()));
+  if (fromChecks.length > 0) return [...new Set(fromChecks)].filter((a) => present.has(a));
+  // Never fall back to "every aria-* on the element": that deleted states axe never flagged.
+  return findProhibitedAriaAttrs(html, node?.failureSummary, false);
+}
+
+/**
+ * Make the element the control its state attributes describe. A div/span button
+ * with simple content becomes a native <button type="button"> (focusable and
+ * keyboard-operable for free); anything else gets the role plus tabindex="0".
+ */
+function toControl(html: string, role: string): { fixHtml: string; native: boolean } {
+  const tag = extractTagName(html);
+  const closing = new RegExp(`</${tag}\\s*>\\s*$`, 'i');
+  const open = html.match(/^<[^>]*>/)?.[0] ?? '';
+  const inner = html.slice(open.length).replace(closing, '');
+  if (role === 'button' && (tag === 'div' || tag === 'span') && closing.test(html) && !BLOCK_CONTENT.test(inner)) {
+    let opening = open.replace(new RegExp(`^<${tag}\\b`, 'i'), '<button type="button"');
+    opening = setAttribute(opening, 'role', null);
+    if (/^\s*0\s*$/.test(getAttributeValue(opening, 'tabindex'))) opening = setAttribute(opening, 'tabindex', null);
+    return { fixHtml: `${opening}${inner}</button>`, native: true };
+  }
+  let fixed = setAttribute(html, 'role', role);
+  if (!hasAttribute(fixed, 'tabindex')) fixed = setAttribute(fixed, 'tabindex', '0');
+  return { fixHtml: fixed, native: false };
+}
 // For the attributes most often misplaced, the roles that DO allow them, so the
 // explanation can say "or add the role, if that is what this element is".
 const ATTR_ALLOWED_ROLES: Record<string, string[]> = {
@@ -755,10 +805,36 @@ export const FIX_TEMPLATES: Record<string, FixTemplate> = {
   'aria-allowed-attr': {
     errorSummary: 'Element has ARIA attributes that are not allowed for its role',
     generateFix: (html, node) => {
-      // #6: axe names the offending attribute(s) in failureSummary, e.g.
-      // 'ARIA attribute is not allowed: aria-level="1"'. Remove exactly those.
+      // #6: axe names the offending attribute(s) in its check data and in
+      // failureSummary, e.g. 'ARIA attribute is not allowed: aria-level="1"'.
       // Never strip the accessible name (aria-label / aria-labelledby).
-      const flagged = findProhibitedAriaAttrs(html, node?.failureSummary).filter((a) => !NAME_PROVIDING_ARIA.has(a));
+      const flagged = flaggedAllowedAttrs(html, node).filter((a) => !NAME_PROVIDING_ARIA.has(a));
+      // #17: a control state (aria-expanded/pressed/checked) on an element with
+      // no real role means the element IS that control: fix the role, keep the state.
+      const roleTokens = getAttributeValue(html, 'role').trim().split(/\s+/).filter(Boolean);
+      const explicit = roleTokens.length ? resolveRoleToken(roleTokens[0]) : null;
+      const roleIsIntentional = explicit !== null && !NON_SEMANTIC_ROLES.has(explicit.role);
+      const controlRole = flagged.map((a) => STATE_CONTROL_ROLE[a]).find(Boolean);
+      if (controlRole && !roleIsIntentional) {
+        const keep = CONTROL_ROLE_ALLOWS[controlRole];
+        let base = html;
+        const dropped = flagged.filter((a) => !keep.has(a));
+        for (const a of dropped) base = setAttribute(base, a, null);
+        const { fixHtml, native } = toControl(base, controlRole);
+        const kept = flagged.filter((a) => keep.has(a));
+        const was = roleTokens.length ? ` (its role="${roleTokens.join(' ')}" is not a valid control role)` : '';
+        return {
+          fixHtml,
+          explanation:
+            `${kept.join(' and ')} describe${kept.length === 1 ? 's' : ''} the state of a ${controlRole}, but this element is not one${was}. ` +
+            (native
+              ? 'Changed it to a native <button type="button">, which keeps the state, takes keyboard focus and responds to Enter and Space without extra code. Reset the button\'s default styles in CSS if needed. '
+              : `Gave it role="${controlRole}" and tabindex="0" so it keeps the state and can take focus. Make sure Enter and Space activate it` +
+                (controlRole === 'checkbox' ? ' and toggle aria-checked' : '') + ', or use a native element instead. ') +
+            'Deleting the attribute would also clear the axe rule, but screen-reader users would lose the state.' +
+            (dropped.length ? ` Removed ${dropped.join(', ')}, which a ${controlRole} does not support.` : ''),
+        };
+      }
       if (flagged.length === 0) {
         return {
           fixHtml: html,

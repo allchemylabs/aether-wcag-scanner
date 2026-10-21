@@ -23,7 +23,8 @@ directly from a tool result.
 The only authoritative "did this fix work?" signal is the `verification` block
 returned by `aether_scan_and_fix` / `aether_get_fix`, or a call to
 `aether_verify_fix`. When you report on a fix, cite the measured fields:
-`targetCleared`, `newViolations`, `resolvedViolations`, and `complianceDelta`.
+`verified`, `targetCleared`, `regressions`, `newViolations`, `resolvedViolations`, and
+`complianceDelta`. `regressions` lists what a fix took away from the element (for example lost aria-expanded, no longer focusable); a fix with regressions is not `verified` even when `targetCleared` is true, so say so and don't apply it as is.
 Any added context must be labeled unverified and based only on provided data.
 
 **Do not rank or market the tools.** Don't compare them or praise their speed,
@@ -42,7 +43,7 @@ concrete markup or code; never a vague "this tool is unreliable".
 **Never claim you "fixed" anything unless you actually changed source.** The
 tools only *generate* suggested `fixHtml`; they do not modify any file. A fix is
 only "applied"/"fixed"/"resolved" after you run `Edit` on real source **and** a
-`verification` confirms `targetCleared: true`. When scanning a remote URL you do
+`verification` confirms `verified: true`. When scanning a remote URL you do
 not have the source for, `fixHtml` is a *recommendation only* — say so, and do
 not imply anything was changed.
 
@@ -69,7 +70,7 @@ it depends on whether you have the source:
 
 - **You have the local source** (localhost, a repo you can Read/Edit): locate the
   real element in source and apply the `fixHtml` with the Edit tool. Only after
-  that Edit **and** a passing `verification` (`targetCleared: true`) may you say a
+  that Edit **and** a passing `verification` (`verified: true`) may you say a
   violation is "fixed"/"applied".
 - **Remote URL with no source access:** present the `fixHtml` as a *recommendation
   only*. Do not use the Edit tool on unrelated files and do not imply anything was
@@ -96,8 +97,8 @@ a fix worked without it.
 `aether_scan_and_fix` and `aether_get_fix` already attach a `verification` block
 per fix — read it instead of re-verifying when the fix is unchanged.
 
-Report the measured delta verbatim: `targetCleared`, any `newViolations`
-(regressions), `resolvedViolations`, and `complianceDelta`. If `verification`
+Report the measured delta verbatim: `verified`, `targetCleared`, any `regressions`
+(what the fix took away), any `newViolations`, `resolvedViolations`, and `complianceDelta`. If `verification`
 carries a `note` (e.g. snippet mode can't reproduce color-contrast), relay it
 and prefer a URL re-scan.
 
@@ -114,7 +115,7 @@ for a violation you have not sent to Aether, call `aether_get_fix` for it.
 
 Summarize using measured facts only:
 - Total violations found, and — per the `verification` verdicts — which fixes
-  cleared their target (`targetCleared: true`) vs which did not.
+  are `verified: true` vs which did not clear their target or have `regressions`.
 - Any `newViolations` a fix introduced, and the net `complianceDelta`.
 - WCAG success criteria addressed (from the tool output).
 - Items the tools flagged for manual review (e.g. a `note` about dynamic-theme

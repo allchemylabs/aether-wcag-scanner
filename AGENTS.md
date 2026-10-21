@@ -27,7 +27,8 @@ which the browser scan measures.
      must apply it. Do not imply anything changed.
 4. **Verify.** Read the `verification` block attached to each fix, or call `aether_verify_fix`
    (URL mode re-scans a live page; snippet mode diffs original vs fixed HTML). Report
-   `targetCleared`, `newViolations`, `resolvedViolations` and `complianceDelta` verbatim.
+   `verified`, `targetCleared`, `regressions`, `newViolations`, `resolvedViolations` and
+   `complianceDelta` verbatim. `regressions` lists what a fix took away from the element (for example lost aria-expanded, no longer focusable); a fix with regressions is not `verified` even when `targetCleared` is true, so say so and don't apply it as is.
 5. **Report.** The fixes are the deliverable, not the counts. Include every severity. For each
    generated fix show the target element, the change in one line (for example "background
    #00a2c7 → #00819f" or "add aria-label"), `source`, `confidence.tier`, and the verification
@@ -37,7 +38,7 @@ which the browser scan measures.
 ## Honesty rules
 
 - Never say a violation is "fixed" unless you changed source **and** verification shows
-  `targetCleared: true`.
+  `verified: true`.
 - Relay tool output as-is. Do not add quality or confidence judgements of your own.
 - Do say when a specific fix or finding looks wrong, with evidence: passing verification only
   means axe stopped flagging the rule. If a fix would remove keyboard focus, an ARIA state

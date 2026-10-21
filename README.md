@@ -112,6 +112,28 @@ Run `/wcag-scan <url>` for a guided workflow: scan → review violations → app
 fixes → re-scan to verify → summarize. The skill orchestrates the tools above
 and edits your files in place.
 
+## Hooks
+
+The plugin adds two hooks to Claude Code:
+
+- **Session start:** checks that the plugin's dependencies and Chromium are
+  installed, and installs them on the first run.
+- **After each edit:** when Claude edits an HTML, JSX, TSX, Vue or Svelte file, a
+  quick heuristic check (no browser) reports possible accessibility issues to
+  Claude. It never blocks an edit, and its findings can be false positives.
+
+To turn the post-edit check off in every project, run
+`/plugin configure aether-wcag-scanner@allchemylabs` and set **Post-edit
+accessibility check** to false. To turn it off (or back on) for one project, add
+this to that project's `.claude/settings.local.json`:
+
+```json
+{ "env": { "AETHER_POSTEDIT_HOOK": "0" } }
+```
+
+Use `"1"` to turn it back on for that project. Restart Claude Code after either
+change.
+
 ---
 
 ## Scanning single-page apps

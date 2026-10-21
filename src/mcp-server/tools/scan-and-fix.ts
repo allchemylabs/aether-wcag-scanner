@@ -328,7 +328,7 @@ const DISCLAIMER =
 export function registerScanAndFix(server: McpServer): void {
   server.tool(
     'aether_scan_and_fix',
-    'START HERE for any accessibility / a11y / WCAG question about a URL. Scans the page in a real browser (Playwright + axe-core, desktop/tablet/mobile) for WCAG 2.1 AA violations AND generates grounded fixes in one call; do not fetch and read the page HTML yourself instead. Pass `url` for a page or the `spa` block for a multi-route single-page app. Returns violations grouped by severity, each with fixHtml (a SUGGESTION — nothing is modified), explanation, WCAG techniques, confidence tier, and a measured `verification` block (targetCleared / newViolations / complianceDelta). Defaults generate fixes for the top 10 violations; set maxFixes:0 only if the user explicitly wants a scan without fixes.',
+    'START HERE for any accessibility / a11y / WCAG question about a URL. Scans the page in a real browser (Playwright + axe-core, desktop/tablet/mobile) for WCAG 2.1 AA violations AND generates grounded fixes in one call; do not fetch and read the page HTML yourself instead. Pass `url` for a page or the `spa` block for a multi-route single-page app. Returns violations grouped by severity, each with fixHtml (a SUGGESTION — nothing is modified), explanation, WCAG techniques, confidence tier, and a measured `verification` block (verified / targetCleared / regressions / newViolations / complianceDelta). Defaults generate fixes for the top 10 violations; set maxFixes:0 only if the user explicitly wants a scan without fixes.',
     ScanAndFixInput,
     async ({ url, spa, viewport, maxFixes, minSeverity, verifyFixes }) => {
       const scanId = `scan_${randomUUID()}`;
@@ -420,8 +420,8 @@ async function runSinglePage(
     : undefined;
   const notice = [partialNotice, ragNotice].filter(Boolean).join(' ') || undefined;
 
-  const verifiedCount = fixEntries.filter((e) => e.verification?.targetCleared).length;
-  const unverifiedFixCount = fixEntries.filter((e) => !e.verification?.targetCleared).length;
+  const verifiedCount = fixEntries.filter((e) => e.verification?.verified).length;
+  const unverifiedFixCount = fixEntries.filter((e) => !e.verification?.verified).length;
 
   const output = {
     mode: 'single-page' as const,
@@ -505,8 +505,8 @@ async function runSpa(
       : undefined;
     const notice = [partialNotice, ragNotice].filter(Boolean).join(' ') || undefined;
 
-    const verifiedCount = fixEntries.filter((e) => e.verification?.targetCleared).length;
-    const unverifiedFixCount = fixEntries.filter((e) => !e.verification?.targetCleared).length;
+    const verifiedCount = fixEntries.filter((e) => e.verification?.verified).length;
+    const unverifiedFixCount = fixEntries.filter((e) => !e.verification?.verified).length;
 
     const output = {
       mode: 'spa' as const,

@@ -60,8 +60,9 @@ export function registerVerifyFix(server: McpServer): void {
     'aether_verify_fix',
     'Deterministically verify a WCAG fix with the real Playwright + axe-core engine. ' +
       'URL mode re-scans a live page; snippet mode diffs original vs fixed HTML before deploy. ' +
-      'Returns MEASURED facts: targetCleared, newViolations (regressions), resolvedViolations, ' +
-      'and complianceDelta. This is the authoritative "did the fix work?" signal.',
+      'Returns MEASURED facts: verified, targetCleared, regressions (what the fix took away from the element: ' +
+      'a lost ARIA state, focus, name or interactive role; snippet mode), newViolations, resolvedViolations ' +
+      'and complianceDelta. `verified` (targetCleared with no regressions) is the authoritative "did the fix work?" signal.',
     VerifyFixInput,
     async ({ ruleId, originalHtml, fixedHtml, url, baseline }) => {
       const scanId = `scan_${randomUUID()}`;

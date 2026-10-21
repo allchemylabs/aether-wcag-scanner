@@ -408,6 +408,9 @@ function getTemplateFix(
       html: req.html,
       target: undefined,
       failureSummary: req.failureSummary,
+      // axe's own per-node check data; templates such as aria-allowed-attr read
+      // the flagged attributes from it instead of guessing (#17).
+      checks: req.checks,
       parentHtml: req.parentHtml,
       childrenHtml: req.childrenHtml,
     });

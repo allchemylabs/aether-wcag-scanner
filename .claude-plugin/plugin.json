@@ -1,7 +1,7 @@
 {
   "name": "aether-wcag-scanner",
   "displayName": "Aether WCAG Scanner",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "WCAG 2.1 AA accessibility scanner with RAG-powered fix generation. Scans live URLs via Playwright + axe-core across desktop, tablet, and mobile viewports and returns violations paired with corpus-backed fixes and WCAG technique references.",
   "author": {
     "name": "Allchemy Labs",
@@ -26,6 +26,12 @@
       "description": "Your Allchemy Labs beta key from https://beta.allchemylabs.ai/?src=install (sign in with GitHub). Enables corpus-grounded fixes from the hosted insights engine; the scanner itself runs locally. Change it later with /plugin configure aether-wcag-scanner@allchemylabs.",
       "required": true,
       "sensitive": true
+    },
+    "post_edit_hook": {
+      "type": "boolean",
+      "title": "Post-edit accessibility check",
+      "description": "After Claude edits an HTML/JSX/Vue/Svelte file, a quick heuristic check reports possible accessibility issues to Claude. Set to false to turn it off in every project. A project can override this with AETHER_POSTEDIT_HOOK=0 or 1 in the env block of its .claude/settings.local.json.",
+      "required": false
     }
   }
 }

@@ -6,7 +6,7 @@
  * Claude Code caches a plugin by its plugin.json version, so leaving that at an
  * old value means existing installs never pick up the release (#25).
  */
-export const CLIENT_VERSION = '1.0.7';
+export const CLIENT_VERSION = '1.0.8';
 
 /**
  * How this copy was installed, so cloud logs can tell installs apart:
@@ -20,7 +20,7 @@ export function clientChannel(moduleUrl: string = import.meta.url): string {
   return /[\\/](node_modules|_npx)[\\/]/.test(decodeURIComponent(moduleUrl)) ? 'npx' : 'source';
 }
 
-/** e.g. "aether-wcag-scanner/1.0.7 (npx; node/24.1.0)". Cloud Run logs this on every request. */
+/** e.g. "aether-wcag-scanner/1.0.8 (npx; node/24.1.0)". Cloud Run logs this on every request. */
 export function clientUserAgent(): string {
   return `aether-wcag-scanner/${CLIENT_VERSION} (${clientChannel()}; node/${process.versions.node})`;
 }

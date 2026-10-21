@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import { ensureChromiumInstalled } from './browser-bootstrap.ts';
 import type { Browser, BrowserContext } from 'playwright';
 import { runAxeOnPage as runAxe } from './axe.ts';
+import { captureRootSemantics, type ElementSemantics } from './element-semantics.ts';
 import { loadUIAutomationSteps } from '../ui-automation/step-loader.ts';
 import { runUIAutomationSequenceWithScans } from '../ui-automation/step-runner.ts';
 import type { PageScanResult, Violation, ViolationNode, ViewportResult } from '../../types/a11y';
@@ -499,7 +500,10 @@ export class ClusterScanner {
    * (`javaScriptEnabled:false` makes `AxeBuilder.analyze()` hang) — the CSP is
    * what keeps the snippet's own scripts from executing.
    */
-  async scanHtml(html: string): Promise<{ violations: Violation[]; axeError?: string }> {
+  async scanHtml(
+    html: string,
+    options: { semantics?: boolean; semanticsTag?: string } = {},
+  ): Promise<{ violations: Violation[]; axeError?: string; semantics?: ElementSemantics | null }> {
     if (!this.browser) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
@@ -513,7 +517,9 @@ export class ClusterScanner {
       try {
         await page.setContent(wrapSnippetWithCsp(html), { waitUntil: 'domcontentloaded' });
         await this.waitForDomStable(page, 500, 4000);
-        return await runAxe(page, this.tags);
+        const axe = await runAxe(page, this.tags);
+        // Root element's role / name / states / focusability, for #18 regression checks.
+        return options.semantics ? { ...axe, semantics: await captureRootSemantics(page, options.semanticsTag) } : axe;
       } finally {
         await page.close();
       }
