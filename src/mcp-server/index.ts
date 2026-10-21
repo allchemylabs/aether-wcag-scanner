@@ -25,15 +25,13 @@ import { config as loadDotenv } from 'dotenv';
 import { CLIENT_VERSION } from '../concepts/a11y-scanner/client-version.ts';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { clearUnsetConfigValues } from './env-config.ts';
 
 const PACKAGE_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..', '..');
-// Claude Code substitutes an UNSET plugin userConfig value as an empty string, so
-// the plugin's .mcp.json hands us ALLCHEMY_API_KEY="" when the user skipped the
-// prompt. dotenv treats any present key as "already set" and would then never
-// read the project's .env. Treat empty as unset so the documented .env fallback works.
-for (const name of ['ALLCHEMY_API_KEY', 'ALLCHEMY_INSIGHT_URL']) {
-  if (process.env[name] !== undefined && process.env[name].trim() === '') delete process.env[name];
-}
+// An UNSET plugin userConfig value reaches us as "" or as the literal
+// "${user_config.api_key}" text. dotenv treats any present key as "already set" and
+// would then never read the project's .env, so clear both (see env-config.ts).
+clearUnsetConfigValues(['ALLCHEMY_API_KEY', 'ALLCHEMY_INSIGHT_URL']);
 // Remember where ALLCHEMY_API_KEY came from so the startup line below can say so —
 // the single most common support question is "which key is the plugin using?".
 const apiKeySource: string = process.env.ALLCHEMY_API_KEY ? 'shell environment' : '';
@@ -75,7 +73,7 @@ export const SERVER_INSTRUCTIONS = [
   '',
   'REPORT: the fixes are the deliverable, not the counts. Include every severity (critical, serious, moderate, minor). For EACH generated fix show: the target element, the change in one line (e.g. "background #00a2c7 → #00819f" or "add aria-label"), source (rag/template), confidence.tier, and the verification fields (targetCleared, newViolations, complianceDelta) or the verification note. Group fixes that share one root cause (e.g. one colour token) and say so.',
   '',
-  'HONESTY: relay tool output as-is. Do not invent quality or confidence claims. Each fix carries source (rag = cloud engine, template = local fallback), fixTier, confidence.tier (grounded | best_effort | abstain) and rationale; show them. An abstain means no grounded fix exists; say so rather than inventing one. A `note` on a verification (e.g. contrast cannot be measured on an isolated snippet) must be relayed.',
+  'HONESTY: relay tool output as-is. Do not invent quality or confidence claims. Each fix carries source (rag = cloud engine, template = local fallback), fixTier, confidence.tier (grounded | best_effort | abstain) and rationale; show them. An abstain means no grounded fix exists; say so rather than inventing one. A `note` on a verification (e.g. contrast cannot be measured on an isolated snippet) must be relayed. Do say when a specific fix or finding looks wrong, with evidence: verification only shows axe stopped flagging the rule, so if a fix removes keyboard focus, an ARIA state (e.g. aria-expanded), an accessible name or content, or a finding is a false positive in the real source, explain why and do not apply it.',
   '',
   'CITATIONS: cite only the WCAG techniques and success criteria the tools returned for that element. If you add one yourself, label it as your own suggestion, not Aether\'s, and never list it alongside Aether\'s grounded citations. Before citing techniques for a violation you have not sent to Aether, call aether_get_fix for it (pass `html`).',
   '',

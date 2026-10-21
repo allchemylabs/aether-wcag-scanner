@@ -10,7 +10,7 @@
  * plan status rather than silently degrading.
  */
 
-import { getInsights, InsightApiError } from '../../concepts/a11y-scanner/insight-client.ts';
+import { getInsights, getInsightApiUrl, InsightApiError } from '../../concepts/a11y-scanner/insight-client.ts';
 import type { InsightResponse, RenderMode } from '../../concepts/a11y-scanner/insight-client.ts';
 import { logError } from './log.ts';
 import { FIX_TEMPLATES } from '../../testing-agent/fix-templates.ts';
@@ -54,8 +54,13 @@ export interface TierInfo {
   dailyLimit?: number;
 }
 
+/**
+ * Why cloud fixes degraded to local ones: a rate limit / auth / expiry answer from
+ * insights-api, or (`reason` set) a request that never got a usable answer (#27).
+ */
 export interface RateLimitInfo {
   tier: string;
+  reason?: 'unreachable' | 'timeout' | 'server_error';
   dailyUsed?: number;
   dailyLimit?: number;
   resetsAt?: string;
@@ -181,13 +186,14 @@ export async function getFix(req: FixRequest): Promise<FixResponse> {
         rateLimitInfo,
       };
     }
-    // Other errors (network, 500, etc.) — previously fell through silently.
-    // Log the cause so a "fixes came back as templates" bug report is traceable.
+    // Other errors (network, timeout, 5xx). These never reach insights-api's
+    // logs, so the notice is the user's only clue that fixes degraded (#27).
     logError('getFix RAG error fallback → template', err, {
       scanId: req.scanId,
       ruleId: req.ruleId,
       status: err instanceof InsightApiError ? err.status : undefined,
     });
+    return { ...getTemplateFix(req, metadata), rateLimitInfo: describeCloudFailure(err) };
   }
 
   // Fallback: local fix templates
@@ -247,12 +253,24 @@ export async function explainViolation(ruleId: string, scanId?: string): Promise
         rateLimitInfo,
       };
     }
-    // Other errors — previously fell through to metadata silently.
+    // Other errors (network, timeout, 5xx) — say so instead of a silent fallback (#27).
     logError('explainViolation RAG error fallback → metadata', err, {
       scanId,
       ruleId,
       status: err instanceof InsightApiError ? err.status : undefined,
     });
+    const template = FIX_TEMPLATES[ruleId];
+    return {
+      ruleId,
+      description: metadata?.description ?? `Axe rule: ${ruleId}`,
+      impact: metadata?.impact ?? 'unknown',
+      wcagCriteria: metadata?.wcag ?? [],
+      techniques: [],
+      failures: [],
+      fixGuidance: template?.errorSummary ?? 'No additional guidance available.',
+      source: 'metadata',
+      rateLimitInfo: describeCloudFailure(err),
+    };
   }
 
   // Fallback: static metadata
@@ -331,6 +349,50 @@ function parseApiError(err: unknown): RateLimitInfo | undefined {
   }
 
   return undefined;
+}
+
+/** Host of the insights endpoint, for a notice (never the full URL or headers). */
+function insightHost(): string {
+  try {
+    return new URL(getInsightApiUrl()).host;
+  } catch {
+    return 'the configured ALLCHEMY_INSIGHT_URL';
+  }
+}
+
+/**
+ * Turn a non-auth cloud failure into a user-facing degradation notice (#27).
+ * Before this, a blocked network or a 5xx fell back to templates with no notice,
+ * indistinguishable from a normal scan — a pilot customer's scan never reached
+ * insights-api and nothing said so.
+ */
+export function describeCloudFailure(err: unknown): RateLimitInfo {
+  const tail = 'so these are local template fixes. Your API key was not checked.';
+  if (err instanceof InsightApiError) {
+    return {
+      tier: 'unknown',
+      reason: 'server_error',
+      message: `The Aether cloud engine at ${insightHost()} answered HTTP ${err.status}, ${tail} Try again shortly.`,
+    };
+  }
+  const e = err as { name?: string; message?: string; cause?: { code?: string; message?: string } } | undefined;
+  if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+    return {
+      tier: 'unknown',
+      reason: 'timeout',
+      message: `The Aether cloud engine at ${insightHost()} did not answer in time, ${tail}`,
+    };
+  }
+  const detail = (e?.cause?.code ?? e?.cause?.message ?? e?.message ?? 'unknown error')
+    .replace(/[\r\n]+/g, ' ')
+    .slice(0, 120);
+  return {
+    tier: 'unknown',
+    reason: 'unreachable',
+    message:
+      `Couldn't reach the Aether cloud engine at ${insightHost()} (${detail}), ${tail} ` +
+      'If you are behind a proxy or firewall, allow HTTPS to that host.',
+  };
 }
 
 /**

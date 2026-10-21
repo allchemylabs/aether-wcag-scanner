@@ -38,9 +38,12 @@ the WCAG spec, so the agent is working from measurements rather than inference.
 Once the official Claude Code marketplace listing is live, you can also install
 it directly from there.
 
-The install prompts for your **Allchemy Labs API key**; paste the key you got
-from [beta.allchemylabs.ai](https://beta.allchemylabs.ai/?src=readme). To set or change it
-later:
+Installing with `/plugin install` inside Claude Code prompts for your
+**Allchemy Labs API key**; paste the key you got from
+[beta.allchemylabs.ai](https://beta.allchemylabs.ai/?src=readme). Installing from the
+terminal (`claude plugin install …`), or letting Claude run the install for
+you, does not prompt, so set the key afterwards with the command below. Run
+the same command to change the key later:
 
 ```
 /plugin configure aether-wcag-scanner@allchemylabs
@@ -52,8 +55,10 @@ connected right after install, wait a moment and run `/reload-plugins`.
 
 ### Running without a key
 
-The scanner itself runs locally and works without a key: you get template
-fixes for every violation. A beta key adds higher quality, contextual fixes
+The plugin asks for a key at install because the cloud fixes need one. The
+scanner itself runs locally and still works without a key (for example after a
+terminal install, or via `npx`): you get local template fixes for every
+violation. A beta key adds higher quality, contextual fixes
 from the hosted insights engine; get one at
 [beta.allchemylabs.ai](https://beta.allchemylabs.ai/?src=github) (sign in with GitHub).
 Set it via the prompt above, or put `ALLCHEMY_API_KEY=<key>` in the `.env` of
@@ -78,7 +83,8 @@ The same server is published to npm and the MCP Registry as
 }
 ```
 
-The first scan downloads Chromium once (about 150 MB). Without `ALLCHEMY_API_KEY`
+The first scan downloads Playwright's Chromium once (about 500 MB on disk:
+the browser plus its headless shell). Without `ALLCHEMY_API_KEY`
 the scanner still runs fully offline and returns template fixes.
 
 Claude Code gets the `/wcag-scan` skill, which drives the scan → review → fix → verify

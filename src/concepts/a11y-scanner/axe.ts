@@ -11,6 +11,10 @@ export interface AxeResult {
 // Cap related nodes per check to bound the request payload (some rules can
 // enumerate many related elements). 12 is generous for real fixes.
 const MAX_RELATED_NODES = 12;
+/** Elements up to this size are sent to the fixer whole (#21). */
+const FULL_HTML_CAP = 4000;
+/** Text kept inside an oversized element whose children are dropped. */
+const FULL_HTML_TEXT_CAP = 200;
 
 /**
  * Normalize an axe check bucket (`any`/`all`/`none`) into the trimmed shape the
@@ -72,6 +76,9 @@ export async function runAxeOnPage(page: Page, tags?: string[]): Promise<AxeResu
     // URL guard; keeps untrusted snippet markup out of the fix payload).
     const pageUrl = page.url();
     const enrich = /^https?:/i.test(pageUrl);
+    // axe-core shortens node.html once an element is ≥300 chars (attribute values
+    // cut to 20 chars + '...', trailing attributes dropped), which the fixer then
+    // echoed into fixHtml (#21). Capture the real markup alongside it.
     for (const violation of violations) {
       if (!enrich) break;
       if (!violation.nodes) continue;
@@ -79,9 +86,20 @@ export async function runAxeOnPage(page: Page, tags?: string[]): Promise<AxeResu
         const targets = Array.isArray(node.target) ? node.target : node.target ? [node.target] : [];
         if (targets.length === 0) continue;
         try {
-          const domContext = await page.evaluate((selector: string) => {
+          const domContext = await page.evaluate(({ selector, fullCap, textCap }) => {
             const el = document.querySelector(selector);
             if (!el) return null;
+
+            // Full element markup for the fixer and verification. Oversized
+            // elements keep their complete opening tag (every attribute intact)
+            // with the text content clipped, rather than markup cut mid-tag.
+            let fullHtml = el.outerHTML;
+            if (fullHtml.length > fullCap) {
+              const shell = el.cloneNode(false) as Element;
+              const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+              shell.textContent = text.length > textCap ? `${text.slice(0, textCap)}…` : text;
+              fullHtml = shell.outerHTML;
+            }
 
             // Parent: outerHTML with children replaced by placeholder
             const parent = el.parentElement;
@@ -111,10 +129,11 @@ export async function runAxeOnPage(page: Page, tags?: string[]): Promise<AxeResu
               siblingHtml = tags.join(' ');
             }
 
-            return { parentHtml, childrenHtml, siblingHtml };
-          }, targets[0]);
+            return { fullHtml, parentHtml, childrenHtml, siblingHtml };
+          }, { selector: targets[0], fullCap: FULL_HTML_CAP, textCap: FULL_HTML_TEXT_CAP });
 
           if (domContext) {
+            if (domContext.fullHtml && domContext.fullHtml !== node.html) node.fullHtml = domContext.fullHtml;
             node.parentHtml = domContext.parentHtml?.substring(0, 500) || undefined;
             node.childrenHtml = domContext.childrenHtml?.substring(0, 1000) || undefined;
             node.siblingHtml = domContext.siblingHtml?.substring(0, 500) || undefined;

@@ -17,8 +17,8 @@ allowed-tools:
 
 Relay tool outputs verbatim — `fixHtml`, scan results, and verification verdicts
 come from the tools, not from you. Do **NOT** invent quality, effectiveness, or
-confidence claims (e.g. "Solid", "Bad fix", "No-op", "this should work") unless
-they come directly from a tool result.
+confidence claims (e.g. "Solid", "this should work", "great fix") unless they come
+directly from a tool result.
 
 The only authoritative "did this fix work?" signal is the `verification` block
 returned by `aether_scan_and_fix` / `aether_get_fix`, or a call to
@@ -26,12 +26,18 @@ returned by `aether_scan_and_fix` / `aether_get_fix`, or a call to
 `targetCleared`, `newViolations`, `resolvedViolations`, and `complianceDelta`.
 Any added context must be labeled unverified and based only on provided data.
 
-**Do not editorialize about the tools themselves.** Never rank, compare, or
-comment on their speed, robustness, reliability, or which is "better" (e.g. "the
-SPA scan is the most robust", "the single-URL scan is more reliable"). Select the
+**Do not rank or market the tools.** Don't compare them or praise their speed,
+robustness or reliability (e.g. "the SPA scan is the most robust"). Select the
 appropriate tool for the task and relay its results. If a tool returns no results
-or fails, state that factually and try an alternative — without characterizing
-the toolset.
+or fails, state that factually and try an alternative.
+
+**Do say when a specific result looks wrong, with evidence.** Passing
+verification only means axe stopped flagging the rule. If a suggested fix would
+remove semantics or behaviour — keyboard focus, an ARIA state such as
+`aria-expanded`, an accessible name, visible content — or a finding looks like a
+false positive in the real source (e.g. a label supplied by a component, a hidden
+input), tell the user what you see and why, and don't apply that fix. Point to the
+concrete markup or code; never a vague "this tool is unreliable".
 
 **Never claim you "fixed" anything unless you actually changed source.** The
 tools only *generate* suggested `fixHtml`; they do not modify any file. A fix is
@@ -112,4 +118,5 @@ Summarize using measured facts only:
 - Any `newViolations` a fix introduced, and the net `complianceDelta`.
 - WCAG success criteria addressed (from the tool output).
 - Items the tools flagged for manual review (e.g. a `note` about dynamic-theme
-  contrast or meaningful alt text). Do not add your own pass/fail judgments.
+  contrast or meaningful alt text). Do not add your own pass/fail judgments;
+  report any evidence-based concern about a fix or finding separately, as yours.

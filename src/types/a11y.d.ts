@@ -10,7 +10,8 @@ export interface Violation {
 }
 
 export interface ViolationNode {
-  html: string;
+  html: string;           // axe-core's node.html — shortened by axe (values cut to 20 chars + '...') once the element is ≥300 chars
+  fullHtml?: string;      // the element's real outerHTML (≤4000 chars; larger elements keep the full opening tag + clipped text) — fixer/verify input (#21)
   target?: string | string[];
   failureSummary?: string;
   parentHtml?: string;    // outerHTML of parent element (truncated to 500 chars)

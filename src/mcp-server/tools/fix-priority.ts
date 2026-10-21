@@ -39,3 +39,18 @@ export function interleaveByRule<T extends RuleEntryLike>(entries: T[]): T[] {
   }
   return out;
 }
+
+/**
+ * Pick the entries that get a fix slot and return the rest, in their original
+ * severity order. `remaining` is computed by identity against the chosen set —
+ * slicing the original list by the fix count (the old approach) listed nodes that
+ * were fixed and dropped ones that were not whenever two rules shared a tier (#20).
+ */
+export function splitFixTargets<T extends RuleEntryLike>(
+  entries: T[],
+  maxFixes: number,
+): { toFix: T[]; remaining: T[] } {
+  const toFix = interleaveByRule(entries).slice(0, Math.max(0, maxFixes));
+  const chosen = new Set<T>(toFix);
+  return { toFix, remaining: entries.filter((e) => !chosen.has(e)) };
+}

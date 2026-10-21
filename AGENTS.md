@@ -39,6 +39,10 @@ which the browser scan measures.
 - Never say a violation is "fixed" unless you changed source **and** verification shows
   `targetCleared: true`.
 - Relay tool output as-is. Do not add quality or confidence judgements of your own.
+- Do say when a specific fix or finding looks wrong, with evidence: passing verification only
+  means axe stopped flagging the rule. If a fix would remove keyboard focus, an ARIA state
+  (e.g. `aria-expanded`), an accessible name or content, or a finding is a false positive in
+  the real source, explain what you see and don't apply that fix.
 - Show each fix's `source` (`rag` = cloud engine, `template` = local fallback), `fixTier`,
   `confidence.tier` (`grounded` | `best_effort` | `abstain`) and `rationale`. An `abstain`
   means no grounded fix exists; say so instead of inventing one.

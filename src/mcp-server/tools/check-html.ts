@@ -88,6 +88,9 @@ export function registerCheckHtml(server: McpServer): void {
           techniques: [] as unknown[],
           source: 'heuristic',
         }));
+        // First degradation reason (rate limit / auth / engine unreachable), so a
+        // template result is never silent about why it isn't a cloud fix (#27).
+        let notice: string | undefined;
         const enrichedIssues = await mapLimit(
           toEnrich,
           ENRICH_CONCURRENCY,
@@ -101,6 +104,7 @@ export function registerCheckHtml(server: McpServer): void {
                 mode: 'deterministic',
                 scanId,
               });
+              notice ??= fix.rateLimitInfo?.message;
               return {
                 ruleId: issue.ruleId,
                 description: issue.description,
@@ -144,6 +148,7 @@ export function registerCheckHtml(server: McpServer): void {
                   clean: false,
                   issueCount: allIssues.length,
                   issues: allIssues,
+                  ...(notice ? { notice } : {}),
                   ...(unenriched.length > 0
                     ? { note: `Only the first ${MAX_ENRICHED_ISSUES} issues were enriched with RAG fixes; the rest carry heuristic suggestions.` }
                     : {}),

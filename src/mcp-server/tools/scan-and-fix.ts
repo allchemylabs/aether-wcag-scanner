@@ -19,7 +19,7 @@ import { UnscannableError } from '../../concepts/a11y-scanner/bot-gate.ts';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { withScanner } from '../services/scanner-manager.ts';
-import { interleaveByRule } from './fix-priority.ts';
+import { splitFixTargets } from './fix-priority.ts';
 import { getFix } from '../services/fix-service.ts';
 import { logToolEntry, logError } from '../services/log.ts';
 import type { RateLimitInfo, TierInfo } from '../services/fix-service.ts';
@@ -188,25 +188,48 @@ function toNodeEntries(violations: Violation[], minLevel: number): NodeEntry[] {
   return entries;
 }
 
-/** Generate (and optionally verify) fixes for the top N node entries. */
+/** Longest html / failureSummary excerpt in a remainingViolations row. */
+const REMAINING_EXCERPT_CHARS = 200;
+
+function excerpt(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > REMAINING_EXCERPT_CHARS ? `${flat.slice(0, REMAINING_EXCERPT_CHARS)}…` : flat;
+}
+
+/** A node that got no fix slot, with enough to find it on the page (#20). */
+function toRemainingRow(e: NodeEntry) {
+  const node = e.violation.nodes?.[e.nodeIndex];
+  const html = excerpt(node?.html);
+  const failureSummary = excerpt(node?.failureSummary);
+  return {
+    ruleId: e.violation.id,
+    description: e.violation.description,
+    impact: e.violation.impact,
+    ...(e.route ? { route: e.route } : {}),
+    ...(node?.target ? { target: node.target } : {}),
+    ...(html ? { html } : {}),
+    ...(failureSummary ? { failureSummary } : {}),
+  };
+}
+
+/** Generate (and optionally verify) fixes for the chosen node entries. */
 async function generateFixes(
-  nodeEntries: NodeEntry[],
-  maxFixes: number,
+  toFix: NodeEntry[],
   verifyFixes: boolean,
   scanId: string,
   fallbackUrl?: string,
 ): Promise<FixEntry[]> {
   const fixEntries: FixEntry[] = [];
-  // Round-robin across rules within each severity tier so ten near-identical
-  // ARIA nodes cannot crowd out a strong single-node fix like image-alt.
-  const toFix = interleaveByRule(nodeEntries).slice(0, maxFixes);
 
   for (const { violation, nodeIndex, route, routeUrl } of toFix) {
     const node = violation.nodes![nodeIndex];
+    // Fix and verify the element's real markup, not axe's shortened node.html (#21).
+    const html = node.fullHtml ?? node.html;
     try {
       const fix = await getFix({
         ruleId: violation.id,
-        html: node.html,
+        html,
         parentHtml: node.parentHtml,
         childrenHtml: node.childrenHtml,
         siblingHtml: node.siblingHtml,
@@ -226,7 +249,7 @@ async function generateFixes(
         try {
           verification = await verifySnippet({
             ruleId: violation.id,
-            originalHtml: node.html,
+            originalHtml: html,
             fixedHtml: fix.fixHtml,
           });
         } catch (err) {
@@ -240,7 +263,7 @@ async function generateFixes(
         ruleId: violation.id,
         description: violation.description,
         impact: violation.impact ?? 'unknown',
-        html: node.html,
+        html,
         target: node.target,
         ...(route ? { route } : {}),
         fixHtml: fix.fixHtml,
@@ -267,10 +290,10 @@ async function generateFixes(
         ruleId: violation.id,
         description: violation.description,
         impact: violation.impact ?? 'unknown',
-        html: node.html,
+        html,
         target: node.target,
         ...(route ? { route } : {}),
-        fixHtml: node.html,
+        fixHtml: html,
         explanation: 'Fix generation failed. Review manually.',
         wcagCriteria: [],
         techniques: [],
@@ -386,7 +409,10 @@ async function runSinglePage(
   }
 
   const nodeEntries = toNodeEntries(result.violations, minLevel);
-  const fixEntries = await generateFixes(nodeEntries, maxFixes, verifyFixes, scanId, url);
+  // Round-robin across rules within each severity tier so ten near-identical
+  // ARIA nodes cannot crowd out a strong single-node fix like image-alt.
+  const { toFix, remaining } = splitFixTargets(nodeEntries, maxFixes);
+  const fixEntries = await generateFixes(toFix, verifyFixes, scanId, url);
   const { ragStatus, notice: ragNotice } = ragSummary(fixEntries);
   const partialNotice = result.partial && result.viewportErrors?.length
     ? `Partial scan: the ${result.viewportErrors.map((e) => e.viewport).join(' and ')} viewport failed ` +
@@ -417,13 +443,7 @@ async function runSinglePage(
     ...(notice ? { notice } : {}),
     ...(maxFixes > 0 ? { verifiedCount, unverifiedFixCount } : {}),
     violationsWithFixes: fixEntries,
-    remainingViolations: nodeEntries
-      .slice(fixEntries.length)
-      .map((e) => ({
-        ruleId: e.violation.id,
-        description: e.violation.description,
-        impact: e.violation.impact,
-      })),
+    remainingViolations: remaining.map(toRemainingRow),
   };
 
   return jsonResult(output, notice);
@@ -475,7 +495,8 @@ async function runSpa(
         (SEVERITY_ORDER[a.violation.impact ?? 'minor'] ?? 1),
     );
 
-    const fixEntries = await generateFixes(nodeEntries, maxFixes, verifyFixes, scanId);
+    const { toFix, remaining } = splitFixTargets(nodeEntries, maxFixes);
+    const fixEntries = await generateFixes(toFix, verifyFixes, scanId);
     const { ragStatus, notice: ragNotice } = ragSummary(fixEntries);
     const routeErrors = report.routeErrors ?? [];
     const partialNotice = routeErrors.length
@@ -521,12 +542,7 @@ async function runSpa(
       ...(notice ? { notice } : {}),
       ...(maxFixes > 0 ? { verifiedCount, unverifiedFixCount } : {}),
       violationsWithFixes: fixEntries,
-      remainingViolations: nodeEntries.slice(fixEntries.length).map((e) => ({
-        ruleId: e.violation.id,
-        description: e.violation.description,
-        impact: e.violation.impact,
-        route: e.route,
-      })),
+      remainingViolations: remaining.map(toRemainingRow),
     };
 
     return jsonResult(output, notice);
