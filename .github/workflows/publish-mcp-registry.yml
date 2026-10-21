@@ -5,6 +5,10 @@
 # flow cannot do this for org namespaces because the registry's GitHub App is not installed
 # on the org (registry issues #1527/#1649). Run from the Actions tab (workflow_dispatch) after
 # the npm package for the same version is live, or let a v* tag trigger it.
+#
+# Release order is tag push -> npm publish (2FA, by hand) -> this workflow, so on a tag push
+# the npm version usually isn't live yet. The tag-triggered run then SKIPS (success, with a
+# summary note) instead of failing; a manual run still fails if npm is missing the version.
 name: Publish to MCP Registry
 
 on:
@@ -23,21 +27,35 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Check the npm package for this version exists
+        id: npm
         run: |
           PKG=$(jq -r '.packages[0].identifier' server.json); VER=$(jq -r '.version' server.json)
           echo "expecting $PKG@$VER on npm"
-          npm view "$PKG@$VER" version
+          if npm view "$PKG@$VER" version; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$PKG@$VER is not on npm yet; skipping. After npm publish, run this workflow manually."
+            echo "Skipped: \`$PKG@$VER\` is not on npm yet. After \`npm publish\`, run this workflow from the Actions tab (workflow_dispatch)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::$PKG@$VER is not on npm. Publish it first."
+            exit 1
+          fi
 
       - name: Install mcp-publisher
+        if: steps.npm.outputs.ready == 'true'
         run: |
           curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
           ./mcp-publisher --help | head -1
 
       - name: Validate server.json
+        if: steps.npm.outputs.ready == 'true'
         run: ./mcp-publisher validate
 
       - name: Authenticate (OIDC)
+        if: steps.npm.outputs.ready == 'true'
         run: ./mcp-publisher login github-oidc
 
       - name: Publish
+        if: steps.npm.outputs.ready == 'true'
         run: ./mcp-publisher publish
